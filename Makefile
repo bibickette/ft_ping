@@ -11,7 +11,7 @@ BLUE = \033[0;34m
 RESET = \033[0m
 
 SRC_FILES = \
-# 	test.c 
+	parse_opts.c 
 
 		
 SRC = $(addprefix $(SRC_DIR)/, $(SRC_FILES))

@@ -1,5 +1,4 @@
-#include <stdio.h>
-#include <stdbool.h>
+#include "ft_ping.h"
 
 enum arg_opt
 {
@@ -11,15 +10,7 @@ enum arg_opt
     OPT_VERBOSE  = 1 << 5,
 };
 
-// getopt_long pour checker les options de la ligne de commande
-
-int main(int argc, char *argv[]) {
-    // if(!check_argc(argc, argv)) {
-    //     return 1;
-    // }
-    (void)argc;
-    (void)argv;
-
+void exemple(void) {
     int mode =  (OPT_TTL | OPT_COUNT | OPT_INTERVAL);
     if (mode & OPT_TTL) {
         printf("OPT_TTL is set\n");
@@ -36,8 +27,15 @@ int main(int argc, char *argv[]) {
     if (mode & OPT_TIMEOUT) {
         printf("OPT_TIMEOUT is set\n");
     }
-
     printf("OPT_TTL | OPT_COUNT | OPT_VERBOSE: %d\n", (OPT_TTL | OPT_COUNT | OPT_VERBOSE));
-    printf("Hello, World!\n");
+
+}
+
+int main(int argc, char *argv[]) {
+    (void)argc;
+    (void)argv;
+
+    parse_opts(argc, argv);
+
     return 0;
 }
