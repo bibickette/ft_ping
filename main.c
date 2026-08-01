@@ -1,41 +1,34 @@
 #include "ft_ping.h"
 
-enum arg_opt
-{
-    OPT_TTL      = 1 << 0,
-    OPT_INTERVAL = 1 << 1,
-    OPT_COUNT    = 1 << 2,
-    OPT_TIMEOUT  = 1 << 3,
-    OPT_LINGER   = 1 << 4,
-    OPT_VERBOSE  = 1 << 5,
-};
+static volatile sig_atomic_t g_running = 1;
 
-void exemple(void) {
-    int mode =  (OPT_TTL | OPT_COUNT | OPT_INTERVAL);
-    if (mode & OPT_TTL) {
-        printf("OPT_TTL is set\n");
-    }
-    if (mode & OPT_COUNT) {
-        printf("OPT_COUNT is set\n");
-    }
-    if (mode & OPT_VERBOSE) {
-        printf("OPT_VERBOSE is set\n");
-    }
-    if (mode & OPT_INTERVAL) {
-        printf("OPT_INTERVAL is set\n");
-    }
-    if (mode & OPT_TIMEOUT) {
-        printf("OPT_TIMEOUT is set\n");
-    }
-    printf("OPT_TTL | OPT_COUNT | OPT_VERBOSE: %d\n", (OPT_TTL | OPT_COUNT | OPT_VERBOSE));
-
+static void sigint_handler(int sig){
+    (void)sig; // Unused parameter
+    g_running = 0;
 }
-
 int main(int argc, char *argv[]) {
-    (void)argc;
-    (void)argv;
+    t_ping ping;
 
-    parse_opts(argc, argv);
+    memset(&ping, 0, sizeof(t_ping));
 
+    parse_opts(argc, argv, &ping);
+
+
+    printf("==== Destination: %s\n", ping.dest);
+    printf("mode: %d\n", ping.mode);
+    if (ping.mode & OPT_VERBOSE) {
+        printf("Verbose mode enabled\n");
+    }
+    if (ping.mode & OPT_COUNT) {
+        printf("Count mode enabled\n");
+    }
+
+    signal(SIGINT, sigint_handler);
+
+    while(g_running) {
+        // Main ping loop
+        printf("Pinging %s...\n", ping.dest);
+        sleep(1); // Simulate a ping delay
+    }
     return 0;
 }
