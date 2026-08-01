@@ -25,5 +25,6 @@ typedef struct s_ping
 } t_ping;
 
 void parse_opts(int argc, char *argv[], t_ping *ping);
+void do_ping(t_ping *ping);
 
 #endif
