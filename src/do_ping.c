@@ -50,7 +50,7 @@ static void send_packet(t_ping *ping)
             .type = ICMP_ECHO,
             .code = 0,
             .checksum = 0,
-            .un = {.echo = {.id =  htons(getpid() & 0xffff), .sequence = htons(ping->packets_sent++)}}},
+            .un = {.echo = {.id =  htons(getpid() & 0xffff), .sequence = htons(ping->packets_sent)}}},
         .payload = {0}
 
     };
@@ -67,6 +67,7 @@ static void send_packet(t_ping *ping)
     {
         // un packet echo devrai faire 8 octets
         printf("%sSent %d bytes to %s : payload = %zu ; icmphdr = %zu ; iphdr = %zu%s\n", YELLOW, result, ping->dest, sizeof(packet.payload), sizeof(struct icmphdr), sizeof(struct iphdr), RESET);
+        ping->packets_sent++;
     }
 }
 
@@ -87,6 +88,7 @@ static void receive_packet(t_ping *ping)
         printf("%s%d bytes from %s (%s): ", GREEN, result - ip_hdr->ihl * 4, ping->reverse_dns, inet_ntoa(ping->addr.sin_addr));
         printf("icmp_seq=%u ", ntohs(((struct icmphdr *)(buffer + ip_hdr->ihl * 4))->un.echo.sequence));
         printf("ttl=%u%s\n",ip_hdr->ttl, RESET);
+        ping->packets_received++;
     }
 
     // analyze packet
@@ -133,7 +135,7 @@ void resolve_destination(t_ping *ping)
 
     // Translate a socket address to a location and service name.
     // DNS Domain Name System : classique ( name -> IP ) mais aussi reverse ( IP -> name )
-    if (getnameinfo((struct sockaddr *)&ping->addr, sizeof(ping->addr), ping->reverse_dns, sizeof(ping->reverse_dns), NULL, 0, NI_NAMEREQD) != 0)
+    if (getnameinfo((struct sockaddr *)&ping->addr, sizeof(ping->addr), ping->reverse_dns, sizeof(ping->reverse_dns), NULL, 0, 0) != 0)
     {
         perror("getnameinfo failed");
         exit(EXIT_FAILURE);

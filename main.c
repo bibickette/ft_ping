@@ -24,11 +24,19 @@ int main(int argc, char *argv[])
     resolve_destination(&ping);
 
     do_ping(&ping);
+    
+    close(ping.socket_fd);
 
     printf("\n%s--- %s ping statistics ---%s\n", YELLOW, ping.dest, RESET);
-    printf("\n%s%ld packets transmitted, %ld received%s\n", GREEN, ping.packets_sent, ping.packets_received, RESET);
-    close(ping.socket_fd);
+    printf("\n%s%ld packets transmitted, %ld received, ", GREEN, ping.packets_sent, ping.packets_received);
+    printf("%ld%% packet loss%s\n", (ping.packets_sent - ping.packets_received) * 100 / ping.packets_sent, RESET);
 
     printf("\n%sExiting ft_ping...%s\n", YELLOW, RESET);
     return 0;
 }
+
+/*
+test :
+ping 10.255.255.1 => wait for response et le ctrl c ne marche pas
+
+*/
