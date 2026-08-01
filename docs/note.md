@@ -106,3 +106,51 @@ C'est uniquement à cette étape que tu fais de la résolution DNS — jamais su
 
 
 
+6. construire un packet icmp
+La structure d'un en-tête ICMP Echo Request
+
+Un paquet ICMP Echo Request fait 8 octets d'en-tête, suivis de données optionnelles (le vrai ping ajoute généralement 56 octets de payload par défaut). Voici le format exact (RFC 792) :
+ 0                   1                   2                   3
+ 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|     Type      |     Code      |          Checksum             |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|           Identifier          |        Sequence Number        |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                             Payload...                        |
+
+Type (1 octet) : 8 pour Echo Request, 0 pour Echo Reply
+Code (1 octet) : toujours 0 pour Echo
+Checksum (2 octets) : calculé sur tout le paquet ICMP (on y revient)
+Identifier (2 octets) : identifie ton processus (souvent le PID), utile si plusieurs ping tournent en même temps
+Sequence Number (2 octets) : incrémenté à chaque paquet envoyé, permet de savoir lequel répond à quoi et de détecter les pertes
+
+En C, ta structure libc s'appelle struct icmphdr (dans <netinet/ip_icmp.h>) :
+
+c
+struct icmphdr {
+    uint8_t  type;
+    uint8_t  code;
+    uint16_t checksum;
+    union {
+        struct {
+            uint16_t id;
+            uint16_t sequence;
+        } echo;
+        uint32_t gateway;
+    } un;
+};
+
+C'est quoi le checksum, à quoi ça sert ?
+
+Le checksum est une somme de contrôle : une valeur numérique calculée à partir de tout le contenu du paquet, qui sert à détecter la corruption des données pendant le transport.
+
+Pourquoi c'est nécessaire : les paquets réseau traversent plein d'équipements physiques (câbles, routeurs, cartes réseau) qui peuvent, à cause d'erreurs matérielles/électriques, altérer quelques bits en chemin. Sans vérification, tu recevrais un paquet corrompu sans le savoir.
+
+Principe : l'émetteur calcule le checksum et le met dans l'en-tête. Le récepteur refait le même calcul sur le paquet reçu (checksum mis à zéro pendant le calcul) et compare. Si ça ne correspond pas → le paquet est jeté, considéré corrompu.
+
+Important : ce n'est pas de la sécurité/cryptographie — un checksum ne protège pas contre une modification malveillante volontaire (ça, c'est le rôle du chiffrement/signature). C'est juste une détection d'erreur de transmission accidentelle.
+
+L'algorithme ICMP (identique à celui d'IP) est une somme en complément à un sur 16 bits :
+
+![alt text](image-2.png)
