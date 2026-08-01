@@ -154,3 +154,109 @@ Important : ce n'est pas de la sécurité/cryptographie — un checksum ne prot�
 L'algorithme ICMP (identique à celui d'IP) est une somme en complément à un sur 16 bits :
 
 ![alt text](image-2.png)
+
+
+
+
+
+
+7. payload
+Quand le vrai ping affiche :
+
+PING google.com (142.251.39.110) 56(84) bytes of data.
+
+ça veut dire :
+
+56 = taille du payload ICMP
+84 = taille totale du paquet IP
+
+Détail :
+
++------------------------+
+| IP header              | 20 octets
++------------------------+
+| ICMP header            | 8 octets
++------------------------+
+| Payload                | 56 octet
++------------------------+
+
+Total = 20 + 8 + 56 = 84 octets
+
+Sent 64 bytes to google.com
+
+signifie que tu envoies :
+
++------------------------+
+| ICMP header            | 8 octets
++------------------------+
+| Payload                | 56 octets
++------------------------+
+
+Total ICMP = 64 octets
+
+Le header IP est ajouté par le noyau quand tu utilises :
+
+socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)
+
+Donc sur le réseau ton paquet fait :
+
+20 octets IP
++
+64 octets ICMP
+=
+84 octets
+
+Et à la réception tu obtiens :
+
+Received 84 bytes
+
+C'est simplement une valeur par défaut historique du programme ping.
+
+Ce que dit la norme
+Le protocole ICMP Echo (RFC 792 pour IPv4) définit le format :
+
+0                   1                   2                   3
++-------+-------+-------------------------------+
+| Type  | Code  |          Checksum             |
++-------+-------+-------------------------------+
+|        Identifier        | Sequence Number    |
++-----------------------------------------------+
+|                 Data ...                      |
++-----------------------------------------------+
+
+La partie Data (payload) a une taille variable.
+
+La RFC dit en gros :
+
+l'émetteur peut mettre des données après le header ICMP ;
+le destinataire doit renvoyer ces données exactement.
+Donc ceci est valide :
+
+ICMP header (8) + payload (0 octet)
+
+comme :
+
+ICMP header (8) + payload (56 octets)
+
+ou :
+
+ICMP header (8) + payload (1000 octets)
+
+Pourquoi 56 alors ?
+Le ping historique a choisi :
+
+8 octets ICMP
++ 56 octets data
+= 64 octets ICMP
+
+Pourquoi 64 ? Parce que c'était une taille pratique pour tester les réseaux (et correspondait à une taille couramment observée dans les outils de l'époque).
+
+Ensuite avec IPv4 :
+
+20 octets IP
++ 64 octets ICMP
+= 84 octets
+
+C'est pour ça que tu vois :
+
+PING google.com (...) 56(84) bytes of data.

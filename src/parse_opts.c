@@ -34,6 +34,10 @@ void parse_opts(int argc, char *argv[], t_ping *ping) {
             case 'v':
                 ping->mode |= OPT_VERBOSE;
                 break;
+            case 's':
+                ping->size_payload = atoi(optarg);
+                printf("Option --size with value: %s\n", optarg);
+                break;
             // il ny a pas de defaut car si ca foire cest getoptlong qui renvoie ? et on catch ca dans le case '?' sinon il quitte lui meme
         }
     }

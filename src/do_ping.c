@@ -39,14 +39,25 @@ static uint16_t calculate_checksum(uint16_t *data, int len)
 
 static void send_packet(t_ping *ping)
 {
-    struct icmphdr packet = {
-        .type = ICMP_ECHO,
-        .code = 0,
-        .checksum = 0,
-        .un = {.echo = {.id = 0, .sequence = 0}}};
+    struct ping_packet
+    {
+        struct icmphdr icmp_hdr;
+        char payload[56]; // 56 bytes of payload to make the total packet size 64 bytes
+    };
 
-    packet.checksum = calculate_checksum((uint16_t *)&packet, sizeof(packet));
-    printf("checksum: %u\n", packet.checksum);
+    struct ping_packet packet = {
+        .icmp_hdr =  {
+            .type = ICMP_ECHO,
+            .code = 0,
+            .checksum = 0,
+            .un = {.echo = {.id = 0, .sequence = 0}}
+        },
+        .payload = {0}
+
+    };
+
+    packet.icmp_hdr.checksum = calculate_checksum((uint16_t *)&packet, sizeof(packet));
+    printf("checksum: %u\n", packet.icmp_hdr.checksum);
 
     int result = sendto(ping->socket_fd, &packet, sizeof(packet), 0, (struct sockaddr *)ping->addr, sizeof(*ping->addr));
     if (result < 0)
@@ -56,7 +67,8 @@ static void send_packet(t_ping *ping)
     else
     {
         // un packet echo devrai faire 8 octets
-        printf("%sSent %d bytes to %s%s\n", GREEN, result, ping->dest, RESET);
+        printf("%sSent %d bytes to %s : payload = %zu ; icmphdr = %zu ; iphdr = %zu%s\n", GREEN, result, ping->dest,  sizeof(packet.payload) , sizeof(struct icmphdr) , sizeof(struct iphdr),RESET);
+        ping->packets_sent++;
     }
 }
 
@@ -73,13 +85,14 @@ static void receive_packet(t_ping *ping)
     }
     else
     {
-        printf("%sReceived %d bytes from %s%s\n", GREEN, result, ping->dest, RESET);
+        struct iphdr *ip_hdr = (struct iphdr *)buffer;
+        printf("%s%ld bytes from %s (%s): ttl=%u%s\n", GREEN, result - sizeof(struct iphdr), ping->dest, inet_ntoa(ping->addr->sin_addr), ip_hdr->ttl, RESET);
+        ping->packets_received++;
     }
 
     // analyze packet
 
     // 1. sauter l'en-tête IP
-    // struct iphdr *ip_hdr = (struct iphdr *)buffer;
     struct icmphdr *icmp = (struct icmphdr *)buffer;
 
     printf("type = %u\n", icmp->type);
@@ -89,14 +102,14 @@ static void receive_packet(t_ping *ping)
 
     printf("Packet size: %d bytes\n", result);
 
-    for (int i = 0; i < result; i++)
-    {
-        printf("%02x ", (unsigned char)buffer[i]);
+    // for (int i = 0; i < result; i++)
+    // {
+    //     printf("%02x ", (unsigned char)buffer[i]);
 
-        if ((i + 1) % 16 == 0)
-            printf("\n");
-    }
-    printf("\n");
+    //     if ((i + 1) % 16 == 0)
+    //         printf("\n");
+    // }
+    // printf("\n");
 
 }
 
@@ -120,11 +133,11 @@ void resolve_destination(t_ping *ping)
     // free le res apres utilisation
     freeaddrinfo(res);
 
-    printf("%sResolved IP address for %s - %s%s\n", GREEN, ping->dest, inet_ntoa(ping->addr->sin_addr), RESET);
+    printf("%sFT_PING %s (%s) %lu(%lu) bytes of data.%s\n", GREEN, ping->dest, inet_ntoa(ping->addr->sin_addr), ping->size_payload, ping->size_payload + sizeof(struct iphdr) + sizeof(struct icmphdr), RESET);
     // Si tu veux recevoir le paquet IP complet il faut utiliser SOCK_RAW au lieu de SOCK_DGRAM
     // Avec SOCK_DGRAM + IPPROTO_ICMP, le noyau te fournit une interface "ICMP". Il construit une partie du paquet pour toi et, à la réception, il retire le header IP. C'est pour cela que tu reçois seulement les 8 octets du header ICMP
     // Le premier octet vaut 00 → c'est un ICMP Echo Reply (type = 0), donc c'est cohérent.
-
+    // du coup pour le socket raw il faut utiliser sudo
     ping->socket_fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
     if (ping->socket_fd < 0)
     {
@@ -132,9 +145,6 @@ void resolve_destination(t_ping *ping)
         exit(EXIT_FAILURE);
     }
 
-    send_packet(ping);
-
-    receive_packet(ping);
 }
 
 void do_ping(t_ping *ping)
