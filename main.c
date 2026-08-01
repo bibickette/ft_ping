@@ -23,6 +23,8 @@ int main(int argc, char *argv[])
 
     do_ping(&ping);
 
+    close(ping.socket_fd);
+
     printf("\n%sExiting ft_ping...%s\n", YELLOW, RESET);
     return 0;
 }

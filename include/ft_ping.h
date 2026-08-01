@@ -21,10 +21,14 @@ enum arg_opt
 
 typedef struct s_ping
 {
+    struct sockaddr_in *addr;
+    
     char *dest;
+    int socket_fd;
 
     int mode;
     int count;
+    
     
 } t_ping;
 
