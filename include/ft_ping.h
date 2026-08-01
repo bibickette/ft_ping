@@ -1,12 +1,16 @@
 #ifndef FT_PING_H
 # define FT_PING_H
 
+#define YELLOW "\033[0;33m"
+#define GREEN "\033[0;32m"
+#define RED "\033[0;31m"
+#define RESET "\033[0m"
+
 #include <getopt.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
 #include <unistd.h>
 
 enum arg_opt
@@ -25,6 +29,9 @@ typedef struct s_ping
 } t_ping;
 
 void parse_opts(int argc, char *argv[], t_ping *ping);
+
+/*  do_ping.c */
+void resolve_destination(t_ping *ping);
 void do_ping(t_ping *ping);
 
 #endif

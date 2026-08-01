@@ -40,11 +40,11 @@ void parse_opts(int argc, char *argv[], t_ping *ping) {
 
     int rest_args = argc - optind;
     if(!rest_args){
-        fprintf(stderr, "ft_ping: usage error: Destination address required\n");
+        fprintf(stderr, "%sft_ping: usage error: Destination address required%s\n", RED, RESET);
         exit(EXIT_FAILURE);
     }
     else if(rest_args > 1){
-        fprintf(stderr, "ft_ping: usage error: Operation not permitted\n");
+        fprintf(stderr, "%sft_ping: usage error: Operation not permitted%s\n", RED, RESET);
         exit(EXIT_FAILURE);
     }
 

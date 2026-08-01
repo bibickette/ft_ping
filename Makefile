@@ -32,6 +32,8 @@ $(OBJ_DIR)/%.o :  $(SRC_DIR)/%.c
 $(NAME): $(OBJS)
 	@echo "$(BLUE)Compiling ft_ping...$(RESET)"
 	$(CC) $(CFLAGS) $(OBJS) -o $(NAME)
+	@echo "$(BLUE)ft_ping compiled successfully!$(RESET)"
+	@echo ""
 
 clean :
 	rm -rf $(OBJ_DIR)
