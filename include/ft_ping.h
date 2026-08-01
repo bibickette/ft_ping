@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <netinet/in.h>
 
 enum arg_opt
 {
@@ -21,8 +22,8 @@ enum arg_opt
 
 typedef struct s_ping
 {
-    struct sockaddr_in *addr;
-
+    struct sockaddr_in addr;
+    char reverse_dns[1024];
     char *dest;
     int socket_fd;
 

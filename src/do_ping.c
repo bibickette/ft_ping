@@ -46,12 +46,11 @@ static void send_packet(t_ping *ping)
     };
 
     struct ping_packet packet = {
-        .icmp_hdr =  {
+        .icmp_hdr = {
             .type = ICMP_ECHO,
             .code = 0,
             .checksum = 0,
-            .un = {.echo = {.id = 0, .sequence = 0}}
-        },
+            .un = {.echo = {.id =  htons(getpid() & 0xffff), .sequence = htons(ping->packets_sent++)}}},
         .payload = {0}
 
     };
@@ -59,7 +58,7 @@ static void send_packet(t_ping *ping)
     packet.icmp_hdr.checksum = calculate_checksum((uint16_t *)&packet, sizeof(packet));
     printf("checksum: %u\n", packet.icmp_hdr.checksum);
 
-    int result = sendto(ping->socket_fd, &packet, sizeof(packet), 0, (struct sockaddr *)ping->addr, sizeof(*ping->addr));
+    int result = sendto(ping->socket_fd, &packet, sizeof(packet), 0, (struct sockaddr *)&ping->addr, sizeof(ping->addr));
     if (result < 0)
     {
         perror("sendto failed");
@@ -67,8 +66,7 @@ static void send_packet(t_ping *ping)
     else
     {
         // un packet echo devrai faire 8 octets
-        printf("%sSent %d bytes to %s : payload = %zu ; icmphdr = %zu ; iphdr = %zu%s\n", GREEN, result, ping->dest,  sizeof(packet.payload) , sizeof(struct icmphdr) , sizeof(struct iphdr),RESET);
-        ping->packets_sent++;
+        printf("%sSent %d bytes to %s : payload = %zu ; icmphdr = %zu ; iphdr = %zu%s\n", YELLOW, result, ping->dest, sizeof(packet.payload), sizeof(struct icmphdr), sizeof(struct iphdr), RESET);
     }
 }
 
@@ -86,8 +84,9 @@ static void receive_packet(t_ping *ping)
     else
     {
         struct iphdr *ip_hdr = (struct iphdr *)buffer;
-        printf("%s%ld bytes from %s (%s): ttl=%u%s\n", GREEN, result - sizeof(struct iphdr), ping->dest, inet_ntoa(ping->addr->sin_addr), ip_hdr->ttl, RESET);
-        ping->packets_received++;
+        printf("%s%d bytes from %s (%s): ", GREEN, result - ip_hdr->ihl * 4, ping->reverse_dns, inet_ntoa(ping->addr.sin_addr));
+        printf("icmp_seq=%u ", ntohs(((struct icmphdr *)(buffer + ip_hdr->ihl * 4))->un.echo.sequence));
+        printf("ttl=%u%s\n",ip_hdr->ttl, RESET);
     }
 
     // analyze packet
@@ -110,7 +109,6 @@ static void receive_packet(t_ping *ping)
     //         printf("\n");
     // }
     // printf("\n");
-
 }
 
 void resolve_destination(t_ping *ping)
@@ -124,16 +122,24 @@ void resolve_destination(t_ping *ping)
     int status = getaddrinfo(ping->dest, NULL, &hints, &res);
     if (status != 0)
     {
-        fprintf(stderr, "%sft_ping :    %s  - No address associated with hostname%s\n", RED, ping->dest, RESET);
+        fprintf(stderr, "%sping: %s: %s%s\n", RED, ping->dest, gai_strerror(status), RESET);
         exit(EXIT_FAILURE);
     }
 
     // res->ai_addr contient maintenant la struct sockaddr avec l'IP résolue
-    ping->addr = (struct sockaddr_in *)res->ai_addr;
     // free le res apres utilisation
+    memcpy(&ping->addr, res->ai_addr, sizeof(struct sockaddr_in));
     freeaddrinfo(res);
 
-    printf("%sFT_PING %s (%s) %lu(%lu) bytes of data.%s\n", GREEN, ping->dest, inet_ntoa(ping->addr->sin_addr), ping->size_payload, ping->size_payload + sizeof(struct iphdr) + sizeof(struct icmphdr), RESET);
+    // Translate a socket address to a location and service name.
+    // DNS Domain Name System : classique ( name -> IP ) mais aussi reverse ( IP -> name )
+    if (getnameinfo((struct sockaddr *)&ping->addr, sizeof(ping->addr), ping->reverse_dns, sizeof(ping->reverse_dns), NULL, 0, NI_NAMEREQD) != 0)
+    {
+        perror("getnameinfo failed");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("%sPING %s (%s) %lu(%lu) bytes of data.%s\n", GREEN, ping->dest, inet_ntoa(ping->addr.sin_addr), ping->size_payload, ping->size_payload + sizeof(struct iphdr) + sizeof(struct icmphdr), RESET);
     // Si tu veux recevoir le paquet IP complet il faut utiliser SOCK_RAW au lieu de SOCK_DGRAM
     // Avec SOCK_DGRAM + IPPROTO_ICMP, le noyau te fournit une interface "ICMP". Il construit une partie du paquet pour toi et, à la réception, il retire le header IP. C'est pour cela que tu reçois seulement les 8 octets du header ICMP
     // Le premier octet vaut 00 → c'est un ICMP Echo Reply (type = 0), donc c'est cohérent.
@@ -144,7 +150,6 @@ void resolve_destination(t_ping *ping)
         perror("socket creation failed");
         exit(EXIT_FAILURE);
     }
-
 }
 
 void do_ping(t_ping *ping)
