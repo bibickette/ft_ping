@@ -15,6 +15,11 @@ static bool verify_checksum(struct icmphdr *receive_data)
     return received_checksum == calculated_checksum;
 }
 
+static bool verify_sequence(struct icmphdr *receive_data, ssize_t *packets_received)
+{
+    return ntohs(receive_data->un.echo.sequence) == *packets_received;
+}
+
 static bool is_addr_match(struct sockaddr_in *addr, struct sockaddr_in *recv_addr)
 {
     return addr->sin_addr.s_addr == recv_addr->sin_addr.s_addr;
@@ -56,17 +61,16 @@ int receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_rec
     struct iphdr *ip_hdr = (struct iphdr *)buffer;
     // ip_hdr->ihl * 4 -> gives the size of the IP header in bytes, so we can use it to find the start of the ICMP header in the received packet.
     struct icmphdr *icmp = (struct icmphdr *)(buffer + ip_hdr->ihl * 4);
-    // 1. verify type and id
-    // 2. verify checksum
-    // 3. verify sequence number
-    // 4. verify source address
-    if (!verify_checksum(icmp))
-    {
-        printf("Checksum verification failed\n");
-        // return FAILED;
-    }
 
-    if (is_my_pid(icmp) && ntohs(icmp->un.echo.sequence) == *packets_received && is_addr_match(addr, &recv_addr))
+    // 1. verify type and id
+    // 2. verify source address
+    // 3. verify checksum
+    // 4. verify sequence number
+
+    if (is_my_pid(icmp) 
+        && is_addr_match(addr, &recv_addr) 
+        && verify_checksum(icmp) 
+        && verify_sequence(icmp, packets_received) )
     {
 
         (*packets_received)++;
@@ -79,6 +83,8 @@ int receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_rec
         printf("rtt=%.2f ms%s\n\n", rtt, RESET);
     }
     else
+    // sinon on continue a recevoir jusqua ce que ce soit le bon
+    // virer tout le reste pour un continue
     {
         if (is_echo_from_myself(icmp) || !is_my_pid(icmp))
         {
