@@ -29,11 +29,11 @@ all : $(NAME)
 
 $(OBJ_DIR)/%.o :  $(SRC_DIR)/%.c 
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -c $< -o $@
+	@$(CC) $(CFLAGS) -c $< -o $@
 
 $(NAME): $(OBJS)
 	@echo "$(BLUE)Compiling ft_ping...$(RESET)"
-	$(CC) $(CFLAGS) $(OBJS) -o $(NAME)
+	@$(CC) $(CFLAGS) $(OBJS) -o $(NAME)
 	@echo "$(BLUE)ft_ping compiled successfully!$(RESET)"
 	@echo ""
 

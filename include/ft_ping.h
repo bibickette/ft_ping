@@ -15,7 +15,12 @@
 #include <netinet/in.h>
 #include <sys/time.h>
 
-#define TIMEOUT_SEC 3
+#define TIMEOUT_SEC 1
+
+#define TIMEOUT -1
+#define FAILED 1
+#define SUCCESS 0
+#define OTHER 2
 
 enum arg_opt
 {
@@ -50,6 +55,6 @@ void loop(t_ping *ping);
 void send_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *sequence_number, char *dest, struct timeval *start_time);
 
 /*  receive.c */
-void receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_received, struct timeval *start_time, struct timeval *end_time);
+int receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_received, struct timeval *start_time, struct timeval *end_time);
 
 #endif

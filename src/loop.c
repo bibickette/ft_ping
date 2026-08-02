@@ -60,12 +60,24 @@ void loop(t_ping *ping)
     signal(SIGINT, sigint_handler);
 
     struct timeval start_time, end_time;
+    int res = 0;
 
     while (g_running)
     {
         send_packet(ping->socket_fd, &ping->addr, &ping->packets_sent, ping->dest, &start_time);
-        receive_packet(ping->socket_fd, &ping->addr, &ping->packets_received, &start_time, &end_time);
-        
-        sleep(1); // Simulate a ping delay
+        res=receive_packet(ping->socket_fd, &ping->addr, &ping->packets_received, &start_time, &end_time);
+        switch (res)
+        {
+            case TIMEOUT:
+                printf("%sRequest timed out.%s\n", RED, RESET);
+                break;
+            case FAILED:
+                return;
+            case SUCCESS:
+                sleep(1); // Simulate a ping delay
+                continue; // Continue to the next iteration without sleeping
+        }
+
+        // sleep(1); // Simulate a ping delay
     }
 }

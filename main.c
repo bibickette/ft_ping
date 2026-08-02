@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
     
     if (ping.socket_fd >= 0){
         close(ping.socket_fd);
-        printf("\n--- %s ping statistics ---\n", ping.dest);
+        printf("--- %s ping statistics ---\n", ping.dest);
         printf("%ld packets transmitted, %ld received, ", ping.packets_sent, ping.packets_received);
         printf("%ld%% packet loss\n", (ping.packets_sent - ping.packets_received) * 100 / ping.packets_sent);
     }
@@ -37,9 +37,7 @@ int main(int argc, char *argv[])
 
 /*
 todo:
-add time
-gerer timeout
-ne pas se faire bloquer par recv, setsockopt pour recvfrom 
+gerer timeout => changer pour SELECT
 
 test :
 OK = ping 10.255.255.1 => wait for response et le ctrl c ne marche pas

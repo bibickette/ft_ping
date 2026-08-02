@@ -6,7 +6,9 @@
 #include <netinet/ip.h>
 #include <errno.h>
 
-void receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_received, struct timeval *start_time, struct timeval *end_time)
+
+
+int receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_received, struct timeval *start_time, struct timeval *end_time)
 {
     // receive packet
     char buffer[1024] = {0};
@@ -18,12 +20,11 @@ void receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_re
         if (errno == EAGAIN || errno == EWOULDBLOCK)
         {
             printf("Timeout occurred\n");
+            return TIMEOUT;
         }
-        else
-        {
-            perror("recvfrom failed");
-        }
-        return;
+
+        perror("recvfrom failed");
+        return FAILED;
     }
 
     struct iphdr *ip_hdr = (struct iphdr *)buffer;
@@ -48,11 +49,12 @@ void receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_re
     }
     else
     {
-        if (icmp->type == ICMP_ECHO && icmp->un.echo.id == htons(getpid() & 0xffff))
+        if ((icmp->type == ICMP_ECHO && icmp->un.echo.id == htons(getpid() & 0xffff))
+        || (icmp->type == ICMP_ECHOREPLY && icmp->un.echo.id != htons(getpid() & 0xffff)))
         {
-            printf("PACKET IS FROM MYSELF, ECHO REQUEST, RECEIVE AGAIN\n");
+            // printf("PACKET IS NOT FOR ME, RECEIVE AGAIN\n");
             receive_packet(socket_fd, addr, packets_received, start_time, end_time);
-            return;
+            return SUCCESS;
         }
         else
         {
@@ -61,8 +63,9 @@ void receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_re
             printf("ID: %u\n", ntohs(icmp->un.echo.id));
             printf("Received ICMP type %d code %d\n", icmp->type, icmp->code);
         }
-        return;
+        return SUCCESS;
     }
+    return SUCCESS;
 
     // for (int i = 0; i < result; i++)
     // {
