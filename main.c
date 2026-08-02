@@ -27,9 +27,9 @@ int main(int argc, char *argv[])
     
     if (ping.socket_fd >= 0){
         close(ping.socket_fd);
-        printf("\n%s--- %s ping statistics ---%s\n", YELLOW, ping.dest, RESET);
-        printf("\n%s%ld packets transmitted, %ld received, ", GREEN, ping.packets_sent, ping.packets_received);
-        printf("%ld%% packet loss%s\n", (ping.packets_sent - ping.packets_received) * 100 / ping.packets_sent, RESET);
+        printf("\n--- %s ping statistics ---\n", ping.dest);
+        printf("%ld packets transmitted, %ld received, ", ping.packets_sent, ping.packets_received);
+        printf("%ld%% packet loss\n", (ping.packets_sent - ping.packets_received) * 100 / ping.packets_sent);
     }
 
     printf("\n%sExiting ft_ping...%s\n", YELLOW, RESET);

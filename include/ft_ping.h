@@ -43,4 +43,10 @@ void parse_opts(int argc, char *argv[], t_ping *ping);
 void resolve_destination(t_ping *ping);
 void loop(t_ping *ping);
 
+/*  send.c */
+void send_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *sequence_number, char *dest);
+
+/*  receive.c */
+void receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_received, char *reverse_dns);
+
 #endif
