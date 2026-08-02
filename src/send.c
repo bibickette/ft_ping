@@ -1,8 +1,9 @@
 #include "ft_ping.h"
 #include <netinet/ip_icmp.h>
 #include <netinet/ip.h>
+#include <arpa/inet.h>
 
-static unsigned short calculate_checksum(unsigned short *data, int count)
+unsigned short calculate_checksum(unsigned short *data, int count)
 {
     unsigned short sum = 0;
 
@@ -56,6 +57,7 @@ void send_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *sequence_numb
         (*sequence_number)++;
         // printf("send id : %u, sequence number: %u\n", ntohs(packet.icmp_hdr.un.echo.id), ntohs(packet.icmp_hdr.un.echo.sequence));
         printf("%sSent %d bytes to %s : payload = %zu ; icmphdr = %zu %s\n", YELLOW, result, dest, sizeof(packet.payload), sizeof(struct icmphdr), RESET);
+        printf("sent to ip: %s\n", inet_ntoa(addr->sin_addr));
         // printf("send id : %u, sequence number: %u\n", ntohs(packet.icmp_hdr.un.echo.id), ntohs(packet.icmp_hdr.un.echo.sequence));
     }
     // printf("and checksum: %u\n", packet.icmp_hdr.checksum);

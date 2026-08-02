@@ -52,6 +52,7 @@ void resolve_destination(t_ping *ping);
 void loop(t_ping *ping);
 
 /*  send.c */
+unsigned short calculate_checksum(unsigned short *data, int count);
 void send_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *sequence_number, char *dest, struct timeval *start_time);
 
 /*  receive.c */

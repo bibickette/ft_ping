@@ -64,7 +64,16 @@ void loop(t_ping *ping)
 
     while (g_running)
     {
+        // fd set
+        // fd zero
+        // si mon dernier paquet est envoyé a > timeout => envoyer un autre
         send_packet(ping->socket_fd, &ping->addr, &ping->packets_sent, ping->dest, &start_time);
+        // res = select
+        // if res < 0 && errno != EINTR => perror
+        // si res == 0 -> continue => timeout de select => envoyer un autre paquet
+        // if res > 0 => receive_packet
+        // receive packet : si pas mon paquet => continue
+        // si mon paquet => afficher le rtt et les infos
         res=receive_packet(ping->socket_fd, &ping->addr, &ping->packets_received, &start_time, &end_time);
         switch (res)
         {
@@ -75,9 +84,8 @@ void loop(t_ping *ping)
                 return;
             case SUCCESS:
                 sleep(1); // Simulate a ping delay
-                continue; // Continue to the next iteration without sleeping
+                continue;
         }
 
-        // sleep(1); // Simulate a ping delay
     }
 }
