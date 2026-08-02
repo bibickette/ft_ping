@@ -26,7 +26,7 @@ enum arg_opt
 typedef struct s_ping
 {
     struct sockaddr_in addr;
-    char reverse_dns[1024];
+
     char *dest;
     int socket_fd;
 
@@ -47,9 +47,9 @@ void resolve_destination(t_ping *ping);
 void loop(t_ping *ping);
 
 /*  send.c */
-void send_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *sequence_number, char *dest);
+void send_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *sequence_number, char *dest, struct timeval *start_time);
 
 /*  receive.c */
-void receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_received, char *reverse_dns, struct timeval *start_time, struct timeval *end_time);
+void receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_received, struct timeval *start_time, struct timeval *end_time);
 
 #endif

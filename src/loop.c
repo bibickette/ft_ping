@@ -21,7 +21,8 @@ void resolve_destination(t_ping *ping)
     struct addrinfo hints, *res;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET; // IPv4
-    hints.ai_socktype = 0;
+    hints.ai_socktype = SOCK_RAW;
+    hints.ai_protocol = IPPROTO_ICMP; // ICMP protocol
 
     int status = getaddrinfo(ping->dest, NULL, &hints, &res);
     if (status != 0)
@@ -33,14 +34,7 @@ void resolve_destination(t_ping *ping)
     memcpy(&ping->addr, res->ai_addr, sizeof(struct sockaddr_in));
     freeaddrinfo(res);
 
-    // Translate a socket address to a location and service name.
-    if (getnameinfo((struct sockaddr *)&ping->addr, sizeof(ping->addr), ping->reverse_dns, sizeof(ping->reverse_dns), NULL, 0, 0) != 0)
-    {
-        perror("getnameinfo failed");
-        exit(EXIT_FAILURE);
-    }
-
-    printf("%sPING %s (%s) %lu(%lu) bytes of data.%s\n", GREEN, ping->dest, inet_ntoa(ping->addr.sin_addr), ping->size_payload, ping->size_payload + sizeof(struct iphdr) + sizeof(struct icmphdr), RESET);
+    printf("%sPING %s (%s): %lu bytes of data.%s\n", GREEN, ping->dest, inet_ntoa(ping->addr.sin_addr), ping->size_payload, RESET);
 
     ping->socket_fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
     if (ping->socket_fd < 0)
@@ -69,9 +63,8 @@ void loop(t_ping *ping)
 
     while (g_running)
     {
-        gettimeofday(&start_time, NULL);
-        send_packet(ping->socket_fd, &ping->addr, &ping->packets_sent, ping->dest);
-        receive_packet(ping->socket_fd, &ping->addr, &ping->packets_received, ping->reverse_dns, &start_time, &end_time);
+        send_packet(ping->socket_fd, &ping->addr, &ping->packets_sent, ping->dest, &start_time);
+        receive_packet(ping->socket_fd, &ping->addr, &ping->packets_received, &start_time, &end_time);
         
         sleep(1); // Simulate a ping delay
     }
