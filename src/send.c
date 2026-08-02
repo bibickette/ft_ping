@@ -57,7 +57,7 @@ void send_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *sequence_numb
         (*sequence_number)++;
         // printf("send id : %u, sequence number: %u\n", ntohs(packet.icmp_hdr.un.echo.id), ntohs(packet.icmp_hdr.un.echo.sequence));
         printf("%sSent %d bytes to %s : payload = %zu ; icmphdr = %zu %s\n", YELLOW, result, dest, sizeof(packet.payload), sizeof(struct icmphdr), RESET);
-        printf("sent to ip: %s\n", inet_ntoa(addr->sin_addr));
+        // printf("sent to ip: %s\n", inet_ntoa(addr->sin_addr));
         // printf("send id : %u, sequence number: %u\n", ntohs(packet.icmp_hdr.un.echo.id), ntohs(packet.icmp_hdr.un.echo.sequence));
     }
     // printf("and checksum: %u\n", packet.icmp_hdr.checksum);

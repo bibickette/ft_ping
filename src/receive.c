@@ -6,13 +6,28 @@
 #include <netinet/ip.h>
 #include <errno.h>
 
-bool verify_checksum(struct icmphdr *receive_data)
+static bool verify_checksum(struct icmphdr *receive_data)
 {
     uint16_t received_checksum = receive_data->checksum;
     receive_data->checksum = 0;
     uint16_t calculated_checksum = calculate_checksum((unsigned short *)receive_data, sizeof(struct icmphdr));
     receive_data->checksum = received_checksum;
     return received_checksum == calculated_checksum;
+}
+
+static bool is_addr_match(struct sockaddr_in *addr, struct sockaddr_in *recv_addr)
+{
+    return addr->sin_addr.s_addr == recv_addr->sin_addr.s_addr;
+}
+
+static bool is_echo_from_myself(struct icmphdr *receive_data)
+{
+    return ((receive_data->type == ICMP_ECHO && receive_data->un.echo.id == htons(getpid() & 0xffff)));
+}
+
+static bool is_my_pid(struct icmphdr *receive_data)
+{
+    return ((receive_data->type == ICMP_ECHOREPLY && receive_data->un.echo.id == htons(getpid() & 0xffff)));
 }
 
 /* changer la logique !!
@@ -51,7 +66,7 @@ int receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_rec
         // return FAILED;
     }
 
-    if (icmp->type == ICMP_ECHOREPLY && icmp->un.echo.id == htons(getpid() & 0xffff) && ntohs(icmp->un.echo.sequence) == *packets_received && recv_addr.sin_addr.s_addr == addr->sin_addr.s_addr)
+    if (is_my_pid(icmp) && ntohs(icmp->un.echo.sequence) == *packets_received && is_addr_match(addr, &recv_addr))
     {
 
         (*packets_received)++;
@@ -65,14 +80,16 @@ int receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_rec
     }
     else
     {
-        if ((icmp->type == ICMP_ECHO && icmp->un.echo.id == htons(getpid() & 0xffff)) || (icmp->type == ICMP_ECHOREPLY && icmp->un.echo.id != htons(getpid() & 0xffff)))
+        if (is_echo_from_myself(icmp) || !is_my_pid(icmp))
         {
-            // printf("PACKET IS NOT FOR ME, RECEIVE AGAIN\n");
+            // empeche de recevoir mon echo si ping localhost
+            // si deux ping, regarde que cest bien pour moi, sinon continue a recevoir
             receive_packet(socket_fd, addr, packets_received, start_time, end_time);
             return SUCCESS;
         }
         else
         {
+            // keep in a buffer the expected and received sequence numbers and IP addresses for debugging purposes
             char expected_ip[INET_ADDRSTRLEN];
             char received_ip[INET_ADDRSTRLEN];
 
@@ -81,6 +98,7 @@ int receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_rec
 
             inet_ntop(AF_INET, &recv_addr.sin_addr,
                       received_ip, sizeof(received_ip));
+            // end keeping
             printf("Expected sequence number %zu ; received %u\n", *packets_received, ntohs(icmp->un.echo.sequence));
             printf("Expected source %s ; received %s\n", expected_ip, received_ip);
             printf("ID: %u\n", ntohs(icmp->un.echo.id));
