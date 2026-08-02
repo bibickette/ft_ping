@@ -15,29 +15,28 @@ static void sigint_handler(int sig)
     g_running = 0;
 }
 
-static uint16_t calculate_checksum(uint16_t *data, int len)
+static unsigned short calculate_checksum(unsigned short *data, int count)
 {
-    uint32_t sum = 0;
+    unsigned short sum = 0;
 
-    for (int i = 0; i < len / 2; i++)
+    while(count > 1)
     {
-        sum += data[i];
+        sum += *data++;
+        count -= 2;
     }
 
-    if (len % 2)
+    if (count > 0)
     {
-        sum += ((uint8_t *)data)[len - 1];
+        sum += *(unsigned char *)data;
     }
 
-    while (sum >> 16)
-    {
-        sum = (sum & 0xFFFF) + (sum >> 16);
-    }
+    sum = (sum >> 16) + (sum & 0xFFFF);
+    sum += (sum >> 16);
 
     return ~sum;
 }
 
-static void send_packet(t_ping *ping)
+static void send_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *sequence_number, char *dest)
 {
     struct ping_packet
     {
@@ -50,58 +49,65 @@ static void send_packet(t_ping *ping)
             .type = ICMP_ECHO,
             .code = 0,
             .checksum = 0,
-            .un = {.echo = {.id =  htons(getpid() & 0xffff), .sequence = htons(ping->packets_sent)}}},
+            .un = {.echo = {.id =  htons(getpid() & 0xffff), .sequence = htons(*sequence_number + 1)}}},
         .payload = {0}
 
     };
 
-    packet.icmp_hdr.checksum = calculate_checksum((uint16_t *)&packet, sizeof(packet));
-    printf("checksum: %u\n", packet.icmp_hdr.checksum);
+    packet.icmp_hdr.checksum = calculate_checksum((unsigned short *)&packet, sizeof(packet));
 
-    int result = sendto(ping->socket_fd, &packet, sizeof(packet), 0, (struct sockaddr *)&ping->addr, sizeof(ping->addr));
+    int result = sendto(socket_fd, &packet, sizeof(packet), 0, (struct sockaddr *)addr, sizeof(*addr));
     if (result < 0)
     {
         perror("sendto failed");
+        return;
     }
     else
     {
         // un packet echo devrai faire 8 octets
-        printf("%sSent %d bytes to %s : payload = %zu ; icmphdr = %zu ; iphdr = %zu%s\n", YELLOW, result, ping->dest, sizeof(packet.payload), sizeof(struct icmphdr), sizeof(struct iphdr), RESET);
-        ping->packets_sent++;
+        (*sequence_number)++;
+        printf("%sSent %d bytes to %s : payload = %zu ; icmphdr = %zu ; iphdr = %zu%s\n", YELLOW, result, dest, sizeof(packet.payload), sizeof(struct icmphdr), sizeof(struct iphdr), RESET);
+        printf("packet send with id %u and sequence %u\n", ntohs(packet.icmp_hdr.un.echo.id), ntohs(packet.icmp_hdr.un.echo.sequence));
     }
+    // printf("and checksum: %u\n", packet.icmp_hdr.checksum);
+
 }
 
-static void receive_packet(t_ping *ping)
+static void receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_received, char *reverse_dns)
 {
     // receive packet
     char buffer[1024] = {0};
-    printf("%sWaiting for a response...\n%s", YELLOW, RESET);
+    socklen_t addr_len = sizeof(*addr);
 
-    int result = recvfrom(ping->socket_fd, buffer, 1024, 0, NULL, NULL);
+    int result = recvfrom(socket_fd, buffer, 1024, 0, (struct sockaddr *)addr, &addr_len);
     if (result < 0)
     {
         perror("recvfrom failed");
-    }
-    else
-    {
-        struct iphdr *ip_hdr = (struct iphdr *)buffer;
-        printf("%s%d bytes from %s (%s): ", GREEN, result - ip_hdr->ihl * 4, ping->reverse_dns, inet_ntoa(ping->addr.sin_addr));
-        printf("icmp_seq=%u ", ntohs(((struct icmphdr *)(buffer + ip_hdr->ihl * 4))->un.echo.sequence));
-        printf("ttl=%u%s\n",ip_hdr->ttl, RESET);
-        ping->packets_received++;
+        return;
     }
 
-    // analyze packet
+    (*packets_received)++;
+    struct iphdr *ip_hdr = (struct iphdr *)buffer;
 
-    // 1. sauter l'en-tête IP
-    struct icmphdr *icmp = (struct icmphdr *)buffer;
+    printf("%s%d bytes from %s (%s): ", GREEN, result - ip_hdr->ihl * 4, reverse_dns, inet_ntoa(addr->sin_addr));
+    printf("icmp_seq=%u ", ntohs(((struct icmphdr *)(buffer + ip_hdr->ihl * 4))->un.echo.sequence));
+    printf("ttl=%u%s\n",ip_hdr->ttl, RESET);
 
-    printf("type = %u\n", icmp->type);
-    printf("code = %u\n", icmp->code);
-    printf("id = %u\n", ntohs(icmp->un.echo.id));
-    printf("seq = %u\n", ntohs(icmp->un.echo.sequence));
 
-    printf("Packet size: %d bytes\n", result);
+    // ip_hdr->ihl * 4 -> gives the size of the IP header in bytes, so we can use it to find the start of the ICMP header in the received packet.
+    struct icmphdr *icmp = (struct icmphdr *)(buffer + ip_hdr->ihl * 4);
+
+    if(icmp->type == ICMP_ECHOREPLY && icmp->un.echo.id == htons(getpid() & 0xffff)) {
+        printf("type = %u, is Echo Reply\n", icmp->type);
+        printf("Received packet with expected ID: %u\n",  ntohs(icmp->un.echo.id));
+
+    } else {
+        printf("Received packet with UNexpected ID: %u\n",  ntohs(icmp->un.echo.id));
+        printf("Received ICMP type %d code %d\n",  icmp->type, icmp->code);
+    }
+
+
+    printf("Packet size: %d bytes\n\n", result);
 
     // for (int i = 0; i < result; i++)
     // {
@@ -152,16 +158,18 @@ void resolve_destination(t_ping *ping)
         perror("socket creation failed");
         exit(EXIT_FAILURE);
     }
+
+    // ajouter setsockopt pour le timeout de recvfrom instead of blocking indefinitely
 }
 
-void do_ping(t_ping *ping)
+void loop(t_ping *ping)
 {
     signal(SIGINT, sigint_handler);
 
     while (g_running)
     {
-        send_packet(ping);
-        receive_packet(ping);
+        send_packet(ping->socket_fd, &ping->addr, &ping->packets_sent, ping->dest);
+        receive_packet(ping->socket_fd, &ping->addr, &ping->packets_received, ping->reverse_dns);
         sleep(1); // Simulate a ping delay
     }
 }

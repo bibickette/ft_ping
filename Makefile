@@ -11,7 +11,7 @@ BLUE = \033[0;34m
 RESET = \033[0m
 
 SRC_FILES = \
-	do_ping.c \
+	loop.c \
 	parse_opts.c 
 
 		

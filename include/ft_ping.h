@@ -41,6 +41,6 @@ void parse_opts(int argc, char *argv[], t_ping *ping);
 
 /*  do_ping.c */
 void resolve_destination(t_ping *ping);
-void do_ping(t_ping *ping);
+void loop(t_ping *ping);
 
 #endif
