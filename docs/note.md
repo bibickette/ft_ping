@@ -35,6 +35,7 @@ Un FQDN, c'est un nom lisible par un humain. Mais le réseau IP ne comprend pas 
 
 
 3. C'est quoi le DNS ?
+    // DNS Domain Name System : classique ( name -> IP ) mais aussi reverse ( IP -> name )
 
 Le DNS (Domain Name System) est ce système de traduction. C'est une immense base de données distribuée mondialement, organisée en arbre, qui répond à la question : "quelle est l'adresse IP associée à ce nom ?"
 
@@ -197,7 +198,10 @@ Total ICMP = 64 octets
 Le header IP est ajouté par le noyau quand tu utilises :
 
 socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)
-
+    // Si tu veux recevoir le paquet IP complet il faut utiliser SOCK_RAW au lieu de SOCK_DGRAM
+    // Avec SOCK_DGRAM + IPPROTO_ICMP, le noyau te fournit une interface "ICMP". Il construit une partie du paquet pour toi et, à la réception, il retire le header IP. C'est pour cela que tu reçois seulement les 8 octets du header ICMP
+    // Le premier octet vaut 00 → c'est un ICMP Echo Reply (type = 0), donc c'est cohérent.
+    // du coup pour le socket raw il faut utiliser sudo
 Donc sur le réseau ton paquet fait :
 
 20 octets IP

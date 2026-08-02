@@ -21,7 +21,6 @@ int main(int argc, char *argv[])
         printf("Count mode enabled\n");
     }
 
-    resolve_destination(&ping);
 
     loop(&ping);
     
@@ -43,7 +42,7 @@ gerer timeout
 ne pas se faire bloquer par recv, setsockopt pour recvfrom 
 
 test :
-ping 10.255.255.1 => wait for response et le ctrl c ne marche pas
+OK = ping 10.255.255.1 => wait for response et le ctrl c ne marche pas
 
 
 test idea :
