@@ -22,7 +22,12 @@ int main(int argc, char *argv[])
     }
 
 
-    loop(&ping);
+    if(!loop(&ping)){
+        if(ping.socket_fd >= 0){
+            close(ping.socket_fd);
+        }
+        return 1;
+    }
     
     if (ping.socket_fd >= 0){
         close(ping.socket_fd);
@@ -37,18 +42,18 @@ int main(int argc, char *argv[])
 
 /*
 todo:
-gerer timeout => changer pour SELECT
-
-test :
-OK = ping 10.255.255.1 => wait for response et le ctrl c ne marche pas
 
 
 test idea :
-./myping unknown-domain-xyz
-./myping google.com
-./myping localhost
-./myping 127.0.0.1
-./myping 8.8.8.8
+OK : ./ft_ping unknown-domain-xyz
+OK : ./ft_ping google.com
+OK : ./ft_ping localhost
+OK : ./ft_ping 127.0.0.1
+OK : ./ft_ping 8.8.8.8
+OK : ./ft_ping 10.255.255.1 => la reponse ne vient jamais mais il envoie des paquets
+OK : sans internet
+
+
 
 === Les edge cases auxquels je penserais
 

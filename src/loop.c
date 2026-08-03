@@ -9,7 +9,7 @@
 
 static volatile sig_atomic_t g_running = 1;
 
-static void sigint_handler(int sig)
+void sigint_handler(int sig)
 {
     (void)sig;
     g_running = 0;
@@ -42,50 +42,66 @@ void resolve_destination(t_ping *ping)
         perror("socket creation failed");
         exit(EXIT_FAILURE);
     }
-    struct timeval timeout;
-    timeout.tv_sec = TIMEOUT_SEC; // 3 seconds timeout
-    timeout.tv_usec = 0;
-    if (setsockopt(ping->socket_fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0)
-    {
-        perror("setsockopt failed");
-        exit(EXIT_FAILURE);
-    }
-    // ajouter setsockopt pour le timeout de recvfrom instead of blocking indefinitely
-
 }
 
-void loop(t_ping *ping)
+bool is_timeout(struct timeval *start_time)
+{
+    struct timeval current_time;
+    gettimeofday(&current_time, NULL);
+    // calcul si le current time - start time est > 1 seconde
+    long elapsed_time = (current_time.tv_sec - start_time->tv_sec) * 1000 + (current_time.tv_usec - start_time->tv_usec) / 1000;
+    return elapsed_time >= TIMEOUT_SEC * 1000;
+}
+
+bool loop(t_ping *ping)
 {
     resolve_destination(ping);
     signal(SIGINT, sigint_handler);
+    fd_set read_fds;
 
-    struct timeval start_time, end_time;
+    struct timeval timeout, start_time, end_time;
+    timeout.tv_sec = TIMEOUT_SEC;
+    timeout.tv_usec = 0;
     int res = 0;
 
+    if (!send_packet(ping->socket_fd, &ping->addr, &ping->packets_sent, ping->dest, &start_time)){
+        return false;
+    }
     while (g_running)
     {
+        FD_ZERO(&read_fds);
+        FD_SET(ping->socket_fd, &read_fds);
+
         // fd set
         // fd zero
         // si mon dernier paquet est envoyé a > timeout => envoyer un autre
-        send_packet(ping->socket_fd, &ping->addr, &ping->packets_sent, ping->dest, &start_time);
         // res = select
         // if res < 0 && errno != EINTR => perror
         // si res == 0 -> continue => timeout de select => envoyer un autre paquet
         // if res > 0 => receive_packet
         // receive packet : si pas mon paquet => continue
         // si mon paquet => afficher le rtt et les infos
-        res=receive_packet(ping->socket_fd, &ping->addr, &ping->packets_received, &start_time, &end_time);
-        switch (res)
+        if (is_timeout(&start_time))
         {
-            case TIMEOUT:
-                printf("%sRequest timed out.%s\n", RED, RESET);
-                break;
-            case FAILED:
-                return;
-            case SUCCESS:
-                sleep(1); // Simulate a ping delay
-                continue;
+            // printf("Timeout occurred, sending another packet...\n");
+            if (!send_packet(ping->socket_fd, &ping->addr, &ping->packets_sent, ping->dest, &start_time)){
+                return false;
+            }
         }
-
+        res = select(ping->socket_fd + 1, &read_fds, NULL, NULL, &timeout);
+        if (res < 0){
+            if (errno == EINTR){
+                break;
+            }
+            perror("select failed");
+            break;
+        }
+        if (res > 0){
+            if (!receive_packet(ping->socket_fd, &ping->addr, &ping->packets_received, &start_time, &end_time))
+            {
+                return false;
+            }
+        }
     }
+    return true;
 }

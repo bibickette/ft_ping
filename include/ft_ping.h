@@ -14,13 +14,9 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <sys/time.h>
+#include <errno.h>
 
 #define TIMEOUT_SEC 1
-
-#define TIMEOUT -1
-#define FAILED 1
-#define SUCCESS 0
-#define OTHER 2
 
 enum arg_opt
 {
@@ -49,13 +45,13 @@ void parse_opts(int argc, char *argv[], t_ping *ping);
 
 /*  do_ping.c */
 void resolve_destination(t_ping *ping);
-void loop(t_ping *ping);
+bool loop(t_ping *ping);
 
 /*  send.c */
 unsigned short calculate_checksum(unsigned short *data, int count);
-void send_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *sequence_number, char *dest, struct timeval *start_time);
+bool send_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *sequence_number, char *dest, struct timeval *start_time);
 
 /*  receive.c */
-int receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_received, struct timeval *start_time, struct timeval *end_time);
+bool receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_received, struct timeval *start_time, struct timeval *end_time);
 
 #endif

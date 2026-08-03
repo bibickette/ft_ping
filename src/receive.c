@@ -4,7 +4,6 @@
 #include <arpa/inet.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/ip.h>
-#include <errno.h>
 
 static bool verify_checksum(struct icmphdr *receive_data)
 {
@@ -35,10 +34,7 @@ static bool is_my_pid(struct icmphdr *receive_data)
     return ((receive_data->type == ICMP_ECHOREPLY && receive_data->un.echo.id == htons(getpid() & 0xffff)));
 }
 
-/* changer la logique !!
-si ce nest pas mon paquet => continue
-*/
-int receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_received, struct timeval *start_time, struct timeval *end_time)
+bool receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_received, struct timeval *start_time, struct timeval *end_time)
 {
     // receive packet
     char buffer[1024] = {0};
@@ -48,14 +44,8 @@ int receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_rec
     int result = recvfrom(socket_fd, buffer, 1024, 0, (struct sockaddr *)&recv_addr, &recv_addr_len);
     if (result < 0)
     {
-        if (errno == EAGAIN || errno == EWOULDBLOCK)
-        {
-            printf("Timeout occurred\n");
-            return TIMEOUT;
-        }
-
         perror("recvfrom failed");
-        return FAILED;
+        return false;
     }
 
     struct iphdr *ip_hdr = (struct iphdr *)buffer;
@@ -67,7 +57,8 @@ int receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_rec
     // 3. verify checksum
     // 4. verify sequence number
 
-    if (is_my_pid(icmp) 
+    if (!is_echo_from_myself(icmp)
+        && is_my_pid(icmp) 
         && is_addr_match(addr, &recv_addr) 
         && verify_checksum(icmp) 
         && verify_sequence(icmp, packets_received) )
@@ -80,46 +71,25 @@ int receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_rec
         printf("%s%d bytes from %s: ", GREEN, result - ip_hdr->ihl * 4, inet_ntoa(recv_addr.sin_addr));
         printf("icmp_seq=%u ", ntohs(((struct icmphdr *)(buffer + ip_hdr->ihl * 4))->un.echo.sequence));
         printf("ttl=%u ", ip_hdr->ttl);
-        printf("rtt=%.2f ms%s\n\n", rtt, RESET);
+        printf("rtt=%.3f ms%s\n\n", rtt, RESET);
     }
-    else
-    // sinon on continue a recevoir jusqua ce que ce soit le bon
-    // virer tout le reste pour un continue
-    {
-        if (is_echo_from_myself(icmp) || !is_my_pid(icmp))
-        {
-            // empeche de recevoir mon echo si ping localhost
-            // si deux ping, regarde que cest bien pour moi, sinon continue a recevoir
-            receive_packet(socket_fd, addr, packets_received, start_time, end_time);
-            return SUCCESS;
-        }
-        else
-        {
-            // keep in a buffer the expected and received sequence numbers and IP addresses for debugging purposes
-            char expected_ip[INET_ADDRSTRLEN];
-            char received_ip[INET_ADDRSTRLEN];
+    // else{
+    //     printf("not my packet, ignoring...\n");
+    //         // keep in a buffer the expected and received sequence numbers and IP addresses for debugging purposes
+    //         char expected_ip[INET_ADDRSTRLEN];
+    //         char received_ip[INET_ADDRSTRLEN];
 
-            inet_ntop(AF_INET, &addr->sin_addr,
-                      expected_ip, sizeof(expected_ip));
+    //         inet_ntop(AF_INET, &addr->sin_addr,
+    //                   expected_ip, sizeof(expected_ip));
 
-            inet_ntop(AF_INET, &recv_addr.sin_addr,
-                      received_ip, sizeof(received_ip));
-            // end keeping
-            printf("Expected sequence number %zu ; received %u\n", *packets_received, ntohs(icmp->un.echo.sequence));
-            printf("Expected source %s ; received %s\n", expected_ip, received_ip);
-            printf("ID: %u\n", ntohs(icmp->un.echo.id));
-            printf("Received ICMP type %d code %d\n", icmp->type, icmp->code);
-        }
-        return SUCCESS;
-    }
-    return SUCCESS;
+    //         inet_ntop(AF_INET, &recv_addr.sin_addr,
+    //                   received_ip, sizeof(received_ip));
+    //         // end keeping
+    //         printf("Expected sequence number %zu ; received %u\n", *packets_received, ntohs(icmp->un.echo.sequence));
+    //         printf("Expected source %s ; received %s\n", expected_ip, received_ip);
+    //         printf("ID: %u, my PID: %u\n", ntohs(icmp->un.echo.id), htons(getpid() & 0xffff));
+    //         printf("Received ICMP type %d code %d\n", icmp->type, icmp->code);
 
-    // for (int i = 0; i < result; i++)
-    // {
-    //     printf("%02x ", (unsigned char)buffer[i]);
-
-    //     if ((i + 1) % 16 == 0)
-    //         printf("\n");
     // }
-    // printf("\n");
+    return true;
 }

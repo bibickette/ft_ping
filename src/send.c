@@ -24,7 +24,7 @@ unsigned short calculate_checksum(unsigned short *data, int count)
     return ~sum;
 }
 
-void send_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *sequence_number, char *dest, struct timeval *start_time)
+bool send_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *sequence_number, char *dest, struct timeval *start_time)
 {
     struct ping_packet
     {
@@ -49,7 +49,7 @@ void send_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *sequence_numb
     if (result < 0)
     {
         perror("sendto failed");
-        return;
+        return false;
     }
     else
     {
@@ -60,6 +60,7 @@ void send_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *sequence_numb
         // printf("sent to ip: %s\n", inet_ntoa(addr->sin_addr));
         // printf("send id : %u, sequence number: %u\n", ntohs(packet.icmp_hdr.un.echo.id), ntohs(packet.icmp_hdr.un.echo.sequence));
     }
+    return true;
     // printf("and checksum: %u\n", packet.icmp_hdr.checksum);
 
 }
