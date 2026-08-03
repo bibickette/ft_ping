@@ -14,6 +14,11 @@ static bool verify_checksum(struct icmphdr *receive_data, int icmp_len)
     return received_checksum == calculated_checksum;
 }
 
+static bool is_sequence_expected(struct icmphdr *receive_data, ssize_t *packets_sent)
+{
+    return ntohs(receive_data->un.echo.sequence) < *packets_sent;
+}
+
 static bool is_addr_match(struct sockaddr_in *addr, struct sockaddr_in *recv_addr)
 {
     return addr->sin_addr.s_addr == recv_addr->sin_addr.s_addr;
@@ -29,7 +34,7 @@ static bool is_my_pid(struct icmphdr *receive_data)
     return ((receive_data->type == ICMP_ECHOREPLY && receive_data->un.echo.id == htons(getpid() & 0xffff)));
 }
 
-bool receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_received, struct timeval *end_time)
+bool receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_sent, ssize_t *packets_received, struct timeval *end_time)
 {
     // receive packet
     char buffer[1024] = {0};
@@ -58,6 +63,10 @@ bool receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_re
         printf("Received an echo reply not for me, ignoring...\n");
         return true;
     }
+    if(!is_sequence_expected(icmp, packets_sent)){
+        printf("Received an echo reply with unexpected sequence number, ignoring...\n");
+        return true;
+    }
     if(!is_addr_match(addr, &recv_addr)){
         printf("Received an echo reply from unexpected source, ignoring...\n");
         return true;
@@ -77,6 +86,8 @@ bool receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_re
         // mettre le time de l'envoi dans le payload et le recupere ici pour calculer le rtt
         memcpy(payload, buffer + ip_hdr->ihl * 4 + sizeof(struct icmphdr), sizeof(payload));
         struct timeval *sent_time = (struct timeval *)payload;
+        // inetutils-2.0/ping/ping_common.h:#define MAXWAIT         10     /* Max seconds to wait for response.  */
+        // si le  paquet est recu apres 10s il est considere comme perdu et on ne le prend pas en compte pour le calcul du rtt
 
         (*packets_received)++;
         gettimeofday(end_time, NULL);

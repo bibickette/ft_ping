@@ -42,7 +42,24 @@ int main(int argc, char *argv[])
 
 /*
 todo:
-RTT
+- RTT
+- si le paquet a un late delay (10s au max pour aller retour) => perdu
+    => le flag -W peut changer ce delay
+
+- verbose :
+        int pid = getpid() & 0xFFFF;
+        printf(", id 0x%x = %i", pid, pid);
+- dupplicata de packet : (peut y en avoir 1 ou +)
+➜  ft_ping git:(main) ✗ ./inetutils-2.0/ping/ping localhost
+PING localhost (127.0.0.1): 56 data bytes
+64 bytes from 127.0.0.1: icmp_seq=0 ttl=82 time=0.149 ms
+64 bytes from 127.0.0.1: icmp_seq=0 ttl=82 time=0.197 ms (DUP!)
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=83 time=0.052 ms
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=83 time=0.111 ms (DUP!)
+64 bytes from 127.0.0.1: icmp_seq=2 ttl=84 time=0.065 ms
+^C--- localhost ping statistics ---
+3 packets transmitted, 3 packets received, +2 duplicates, 0% packet loss
+round-trip min/avg/max/stddev = 0.052/0.115/0.197/0.054 ms
 
 test idea :
 OK : ./ft_ping unknown-domain-xyz

@@ -53,6 +53,15 @@ bool is_timeout(struct timeval *start_time)
     return elapsed_time >= TIMEOUT_SEC * 1000;
 }
 
+// fd set
+// fd zero
+// si mon dernier paquet est envoyé a > timeout => envoyer un autre
+// res = select
+// if res < 0 && errno != EINTR => perror
+// si res == 0 -> continue => timeout de select => envoyer un autre paquet
+// if res > 0 => receive_packet
+// receive packet : si pas mon paquet => continue
+// si mon paquet => afficher le rtt et les infos
 bool loop(t_ping *ping)
 {
     resolve_destination(ping);
@@ -65,7 +74,8 @@ bool loop(t_ping *ping)
     timeout.tv_usec = 0;
     int res = 0;
 
-    if (!send_packet(ping->socket_fd, &ping->addr, &ping->packets_sent, ping->dest, &start_time)){
+    if (!send_packet(ping->socket_fd, &ping->addr, &ping->packets_sent, ping->dest, &start_time))
+    {
         return false;
     }
     while (g_running)
@@ -73,31 +83,26 @@ bool loop(t_ping *ping)
         FD_ZERO(&read_fds);
         FD_SET(ping->socket_fd, &read_fds);
 
-        // fd set
-        // fd zero
-        // si mon dernier paquet est envoyé a > timeout => envoyer un autre
-        // res = select
-        // if res < 0 && errno != EINTR => perror
-        // si res == 0 -> continue => timeout de select => envoyer un autre paquet
-        // if res > 0 => receive_packet
-        // receive packet : si pas mon paquet => continue
-        // si mon paquet => afficher le rtt et les infos
         if (is_timeout(&start_time))
         {
-            if (!send_packet(ping->socket_fd, &ping->addr, &ping->packets_sent, ping->dest, &start_time)){
+            if (!send_packet(ping->socket_fd, &ping->addr, &ping->packets_sent, ping->dest, &start_time))
+            {
                 return false;
             }
         }
         res = select(ping->socket_fd + 1, &read_fds, NULL, NULL, &timeout);
-        if (res < 0){
-            if (errno == EINTR){
+        if (res < 0)
+        {
+            if (errno == EINTR)
+            {
                 break;
             }
             perror("select failed");
             return false;
         }
-        if (res > 0){
-            if (!receive_packet(ping->socket_fd, &ping->addr, &ping->packets_received, &end_time))
+        if (res > 0)
+        {
+            if (!receive_packet(ping->socket_fd, &ping->addr, &ping->packets_sent, &ping->packets_received, &end_time))
             {
                 return false;
             }
