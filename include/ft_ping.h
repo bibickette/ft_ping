@@ -52,6 +52,6 @@ unsigned short calculate_checksum(unsigned short *data, int count);
 bool send_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *sequence_number, char *dest, struct timeval *start_time);
 
 /*  receive.c */
-bool receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_received, struct timeval *start_time, struct timeval *end_time);
+bool receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_received, struct timeval *end_time);
 
 #endif

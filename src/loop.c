@@ -44,11 +44,11 @@ void resolve_destination(t_ping *ping)
     }
 }
 
+// calcul si le current time - start time est > 1 seconde
 bool is_timeout(struct timeval *start_time)
 {
     struct timeval current_time;
     gettimeofday(&current_time, NULL);
-    // calcul si le current time - start time est > 1 seconde
     long elapsed_time = (current_time.tv_sec - start_time->tv_sec) * 1000 + (current_time.tv_usec - start_time->tv_usec) / 1000;
     return elapsed_time >= TIMEOUT_SEC * 1000;
 }
@@ -57,6 +57,7 @@ bool loop(t_ping *ping)
 {
     resolve_destination(ping);
     signal(SIGINT, sigint_handler);
+
     fd_set read_fds;
 
     struct timeval timeout, start_time, end_time;
@@ -83,7 +84,6 @@ bool loop(t_ping *ping)
         // si mon paquet => afficher le rtt et les infos
         if (is_timeout(&start_time))
         {
-            // printf("Timeout occurred, sending another packet...\n");
             if (!send_packet(ping->socket_fd, &ping->addr, &ping->packets_sent, ping->dest, &start_time)){
                 return false;
             }
@@ -94,10 +94,10 @@ bool loop(t_ping *ping)
                 break;
             }
             perror("select failed");
-            break;
+            return false;
         }
         if (res > 0){
-            if (!receive_packet(ping->socket_fd, &ping->addr, &ping->packets_received, &start_time, &end_time))
+            if (!receive_packet(ping->socket_fd, &ping->addr, &ping->packets_received, &end_time))
             {
                 return false;
             }

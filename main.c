@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
 
 /*
 todo:
-
+RTT
 
 test idea :
 OK : ./ft_ping unknown-domain-xyz
@@ -52,6 +52,8 @@ OK : ./ft_ping 127.0.0.1
 OK : ./ft_ping 8.8.8.8
 OK : ./ft_ping 10.255.255.1 => la reponse ne vient jamais mais il envoie des paquets
 OK : sans internet
+
+OK : avec un ping delay le time est OK
 
 
 

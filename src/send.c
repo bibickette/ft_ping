@@ -5,9 +5,9 @@
 
 unsigned short calculate_checksum(unsigned short *data, int count)
 {
-    unsigned short sum = 0;
+    unsigned long sum = 0;
 
-    while(count > 1)
+    while (count > 1)
     {
         sum += *data++;
         count -= 2;
@@ -21,7 +21,7 @@ unsigned short calculate_checksum(unsigned short *data, int count)
     sum = (sum >> 16) + (sum & 0xFFFF);
     sum += (sum >> 16);
 
-    return ~sum;
+    return (unsigned short)~sum;
 }
 
 bool send_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *sequence_number, char *dest, struct timeval *start_time)
@@ -37,13 +37,12 @@ bool send_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *sequence_numb
             .type = ICMP_ECHO,
             .code = 0,
             .checksum = 0,
-            .un = {.echo = {.id =  htons(getpid() & 0xffff), .sequence = htons(*sequence_number )}}},
+            .un = {.echo = {.id = htons(getpid() & 0xffff), .sequence = htons(*sequence_number)}}},
         .payload = {0}
-
     };
-
-    packet.icmp_hdr.checksum = calculate_checksum((unsigned short *)&packet, sizeof(packet));
     gettimeofday(start_time, NULL);
+    memcpy((char *)&packet + sizeof(struct icmphdr), start_time, sizeof(*start_time)); // Copy the start time into the payload
+    packet.icmp_hdr.checksum = calculate_checksum((unsigned short *)&packet, sizeof(packet));
 
     int result = sendto(socket_fd, &packet, sizeof(packet), 0, (struct sockaddr *)addr, sizeof(*addr));
     if (result < 0)
@@ -51,16 +50,7 @@ bool send_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *sequence_numb
         perror("sendto failed");
         return false;
     }
-    else
-    {
-        // un packet echo devrai faire 8 octets
-        (*sequence_number)++;
-        // printf("send id : %u, sequence number: %u\n", ntohs(packet.icmp_hdr.un.echo.id), ntohs(packet.icmp_hdr.un.echo.sequence));
-        printf("%sSent %d bytes to %s : payload = %zu ; icmphdr = %zu %s\n", YELLOW, result, dest, sizeof(packet.payload), sizeof(struct icmphdr), RESET);
-        // printf("sent to ip: %s\n", inet_ntoa(addr->sin_addr));
-        // printf("send id : %u, sequence number: %u\n", ntohs(packet.icmp_hdr.un.echo.id), ntohs(packet.icmp_hdr.un.echo.sequence));
-    }
+    (*sequence_number)++;
+    printf("%sSent %d bytes to %s : payload = %zu ; icmphdr = %zu %s\n", YELLOW, result, dest, sizeof(packet.payload), sizeof(struct icmphdr), RESET);
     return true;
-    // printf("and checksum: %u\n", packet.icmp_hdr.checksum);
-
 }
