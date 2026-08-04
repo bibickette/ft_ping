@@ -5,13 +5,11 @@
 #include <netinet/ip_icmp.h>
 #include <netinet/ip.h>
 
+// si on recalcule le checksun et quon tombe sur 0 c'est que le checksum est valide
 static bool verify_checksum(struct icmphdr *receive_data, int icmp_len)
 {
-    uint16_t received_checksum = receive_data->checksum;
-    receive_data->checksum = 0;
     uint16_t calculated_checksum = calculate_checksum((unsigned short *)receive_data, icmp_len);
-    receive_data->checksum = received_checksum;
-    return received_checksum == calculated_checksum;
+    return calculated_checksum == 0;
 }
 
 static bool is_sequence_expected(struct icmphdr *receive_data, ssize_t *packets_sent)
@@ -34,14 +32,27 @@ static bool is_my_pid(struct icmphdr *receive_data)
     return ((receive_data->type == ICMP_ECHOREPLY && receive_data->un.echo.id == htons(getpid() & 0xffff)));
 }
 
-bool receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_sent, ssize_t *packets_received, struct timeval *end_time)
+void fill_rtt(t_rtt *rtt, double time_packet)
+{
+    if (rtt->min == 0 || time_packet < rtt->min)
+    {
+        rtt->min = time_packet;
+    }
+    if (time_packet > rtt->max)
+    {
+        rtt->max = time_packet;
+    }
+    rtt->total += time_packet;
+}
+
+bool receive_packet(t_ping *ping, struct timeval *end_time)
 {
     // receive packet
     char buffer[1024] = {0};
-    struct sockaddr_in recv_addr = *addr;
+    struct sockaddr_in recv_addr = ping->addr;
     socklen_t recv_addr_len = sizeof(recv_addr);
 
-    int result = recvfrom(socket_fd, buffer, 1024, 0, (struct sockaddr *)&recv_addr, &recv_addr_len);
+    int result = recvfrom(ping->socket_fd, buffer, 1024, 0, (struct sockaddr *)&recv_addr, &recv_addr_len);
     if (result < 0)
     {
         perror("recvfrom failed");
@@ -51,7 +62,8 @@ bool receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_se
     struct iphdr *ip_hdr = (struct iphdr *)buffer;
     // ip_hdr->ihl * 4 -> gives the size of the IP header in bytes, so we can use it to find the start of the ICMP header in the received packet.
     struct icmphdr *icmp = (struct icmphdr *)(buffer + ip_hdr->ihl * 4);
-    int icmp_len = result - ip_hdr->ihl * 4; // Length of the ICMP packet icmp header + payload
+    // Length of the ICMP packet icmp header + payload
+    int icmp_len = result - ip_hdr->ihl * 4;
     // 1. verify type and id
     // 2. verify source address
     // 3. verify checksum
@@ -63,11 +75,11 @@ bool receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_se
         printf("Received an echo reply not for me, ignoring...\n");
         return true;
     }
-    if(!is_sequence_expected(icmp, packets_sent)){
+    if(!is_sequence_expected(icmp, &ping->packets_sent)){
         printf("Received an echo reply with unexpected sequence number, ignoring...\n");
         return true;
     }
-    if(!is_addr_match(addr, &recv_addr)){
+    if(!is_addr_match(&ping->addr, &recv_addr)){
         printf("Received an echo reply from unexpected source, ignoring...\n");
         return true;
     }
@@ -84,19 +96,23 @@ bool receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_se
 
         char payload[56] = {0};
         // mettre le time de l'envoi dans le payload et le recupere ici pour calculer le rtt
-        memcpy(payload, buffer + ip_hdr->ihl * 4 + sizeof(struct icmphdr), sizeof(payload));
+        memmove(payload, buffer + ip_hdr->ihl * 4 + sizeof(struct icmphdr), sizeof(payload));
         struct timeval *sent_time = (struct timeval *)payload;
         // inetutils-2.0/ping/ping_common.h:#define MAXWAIT         10     /* Max seconds to wait for response.  */
         // si le  paquet est recu apres 10s il est considere comme perdu et on ne le prend pas en compte pour le calcul du rtt
 
-        (*packets_received)++;
         gettimeofday(end_time, NULL);
-        double rtt = (end_time->tv_sec - sent_time->tv_sec) * 1000.0 + (end_time->tv_usec - sent_time->tv_usec) / 1000.0;
-
+        double time_packet = (end_time->tv_sec - sent_time->tv_sec) * 1000.0 + (end_time->tv_usec - sent_time->tv_usec) / 1000.0;
+        if(time_packet > ping->time_for_reply * 1000.0){
+            printf("Received an echo reply after %.3f ms, ignoring...\n", time_packet);
+            return true;
+        }
+        fill_rtt(&ping->rtt, time_packet);
+        ping->packets_received++;
         printf("%s%d bytes from %s: ", GREEN, result - ip_hdr->ihl * 4, inet_ntoa(recv_addr.sin_addr));
         printf("icmp_seq=%u ", ntohs(((struct icmphdr *)(buffer + ip_hdr->ihl * 4))->un.echo.sequence));
         printf("ttl=%u ", ip_hdr->ttl);
-        printf("rtt=%.3f ms%s\n\n", rtt, RESET);
+        printf("rtt=%.3f ms%s\n\n", time_packet, RESET);
     // }
     // else{
     //     printf("not my packet, ignoring...\n");

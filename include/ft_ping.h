@@ -16,13 +16,23 @@
 #include <sys/time.h>
 #include <errno.h>
 
+/* time to send between packets */
 #define TIMEOUT_SEC 1
+/* time to wait for a reply */
+#define LATE_REPLY 10
 
 enum arg_opt
 {
     OPT_VERBOSE  = 1 << 0,
     OPT_COUNT    = 1 << 1,
 };
+
+typedef struct s_rtt
+{
+    double min;
+    double max;
+    double total;
+} t_rtt;
 
 typedef struct s_ping
 {
@@ -33,13 +43,18 @@ typedef struct s_ping
 
     int mode;
     int count;
+
+    int time_for_reply;
     unsigned long size_payload;
 
     ssize_t packets_sent;
     ssize_t packets_received;
-    
+
+    t_rtt rtt;
     
 } t_ping;
+
+
 
 void parse_opts(int argc, char *argv[], t_ping *ping);
 
@@ -52,6 +67,7 @@ unsigned short calculate_checksum(unsigned short *data, int count);
 bool send_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *sequence_number, char *dest, struct timeval *start_time);
 
 /*  receive.c */
-bool receive_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *packets_sent, ssize_t *packets_received, struct timeval *end_time);
+bool receive_packet(t_ping *ping, struct timeval *end_time);
+
 
 #endif

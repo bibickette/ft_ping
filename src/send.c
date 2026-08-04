@@ -41,7 +41,7 @@ bool send_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *sequence_numb
         .payload = {0}
     };
     gettimeofday(start_time, NULL);
-    memcpy((char *)&packet + sizeof(struct icmphdr), start_time, sizeof(*start_time)); // Copy the start time into the payload
+    memmove((char *)&packet + sizeof(struct icmphdr), start_time, sizeof(*start_time)); // Copy the start time into the payload
     packet.icmp_hdr.checksum = calculate_checksum((unsigned short *)&packet, sizeof(packet));
 
     int result = sendto(socket_fd, &packet, sizeof(packet), 0, (struct sockaddr *)addr, sizeof(*addr));

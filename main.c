@@ -1,5 +1,5 @@
 #include "ft_ping.h"
-
+#include <math.h>
 
 int main(int argc, char *argv[])
 {
@@ -8,6 +8,7 @@ int main(int argc, char *argv[])
     memset(&ping, 0, sizeof(t_ping));
 
     ping.size_payload = 56; // default payload size
+    ping.time_for_reply = LATE_REPLY; // default time to wait for a reply
 
     parse_opts(argc, argv, &ping);
 
@@ -34,6 +35,14 @@ int main(int argc, char *argv[])
         printf("--- %s ping statistics ---\n", ping.dest);
         printf("%ld packets transmitted, %ld received, ", ping.packets_sent, ping.packets_received);
         printf("%ld%% packet loss\n", (ping.packets_sent - ping.packets_received) * 100 / ping.packets_sent);
+        double sqrt_total = ping.rtt.total * ping.rtt.total;
+        double avg_time = ping.rtt.total / ping.packets_received;
+        double variance = (sqrt_total / ping.packets_received) - (avg_time * avg_time);
+        if( variance < 0.0) {
+            variance = 0.0; // Prevent negative variance due to floating-point errors
+        }
+        double stddev = sqrt(variance);
+        printf("round-trip min/avg/max/stddev = %.3f/%.3f/%.3f/%.3f ms\n", ping.rtt.min, avg_time, ping.rtt.max, stddev);
     }
 
     printf("\n%sExiting ft_ping...%s\n", YELLOW, RESET);
@@ -42,13 +51,9 @@ int main(int argc, char *argv[])
 
 /*
 todo:
-- RTT
-- si le paquet a un late delay (10s au max pour aller retour) => perdu
-    => le flag -W peut changer ce delay
+- si le paquet a un late delay (10s au max pour aller retour) => perdu : a reregarder
+    - W signifie de changer le temps dattente sur select mais ne dit pas que le paquet est perdu, cst si ya rien pdnt 1s
 
-- verbose :
-        int pid = getpid() & 0xFFFF;
-        printf(", id 0x%x = %i", pid, pid);
 - dupplicata de packet : (peut y en avoir 1 ou +)
 ➜  ft_ping git:(main) ✗ ./inetutils-2.0/ping/ping localhost
 PING localhost (127.0.0.1): 56 data bytes
