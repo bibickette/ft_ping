@@ -104,10 +104,10 @@ bool receive_packet(t_ping *ping, struct timeval *end_time)
 
         gettimeofday(end_time, NULL);
         double time_packet = (end_time->tv_sec - sent_time->tv_sec) * 1000.0 + (end_time->tv_usec - sent_time->tv_usec) / 1000.0;
-        if(time_packet > ping->time_for_reply * 1000.0){
-            printf("Received an echo reply after %.3f ms, ignoring...\n", time_packet);
-            return true;
-        }
+        // if(time_packet > ping->time_for_reply * 1000.0){
+        //     printf("Received an echo reply after %.3f ms, ignoring...\n", time_packet);
+        //     return true;
+        // }
         fill_rtt(&ping->rtt, time_packet);
         ping->packets_received++;
         printf("%s%d bytes from %s: ", GREEN, result - ip_hdr->ihl * 4, inet_ntoa(recv_addr.sin_addr));

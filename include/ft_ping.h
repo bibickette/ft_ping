@@ -16,7 +16,7 @@
 #include <sys/time.h>
 #include <errno.h>
 
-/* time to send between packets */
+/* time to and select */
 #define TIMEOUT_SEC 1
 /* time to wait for a reply */
 #define LATE_REPLY 10
@@ -33,7 +33,7 @@ typedef struct s_rtt
     double max;
     double total;
     double total_squared; // for variance calculation
-    
+
 } t_rtt;
 
 typedef struct s_ping
@@ -46,7 +46,7 @@ typedef struct s_ping
     int mode;
     int count;
 
-    int time_for_reply;
+    int time_select;
     unsigned long size_payload;
 
     ssize_t packets_sent;

@@ -53,12 +53,12 @@ void resolve_destination(t_ping *ping)
 }
 
 // calcul si le current time - start time est > 1 seconde
-bool is_timeout(struct timeval *start_time)
+bool is_timeout(struct timeval *start_time, int timeout_sec)
 {
     struct timeval current_time;
     gettimeofday(&current_time, NULL);
     long elapsed_time = (current_time.tv_sec - start_time->tv_sec) * 1000 + (current_time.tv_usec - start_time->tv_usec) / 1000;
-    return elapsed_time >= TIMEOUT_SEC * 1000;
+    return elapsed_time >= timeout_sec * 1000;
 }
 
 // fd set
@@ -89,11 +89,12 @@ bool loop(t_ping *ping)
         FD_ZERO(&read_fds);
         FD_SET(ping->socket_fd, &read_fds);
         
-        timeout.tv_sec = ping->time_for_reply;
+        timeout.tv_sec = TIMEOUT_SEC;
         timeout.tv_usec = 0;
 
-        if (is_timeout(&start_time))
+        if (is_timeout(&start_time, TIMEOUT_SEC))
         {
+            // printf("supposed to send\n");
             if (!send_packet(ping->socket_fd, &ping->addr, &ping->packets_sent, ping->dest, &start_time))
             {
                 return false;
@@ -111,9 +112,15 @@ bool loop(t_ping *ping)
         }
         else if(res == 0)
         {
-            // timeout du select => correspond au flag -W
+            // si select na pas recu de paquet pendant -W temps -> alors cest la fin SI on nenvoie pu de paquet
+            // si select recoit rien depuis X temps ET si on a pas de count alors on continue
+            // -W peut changer ce temps
             // -W ne controle pas si laller retour est > a timeout, cest juste pour le select
-            // printf("%sRequest timeout for icmp_seq %ld%s\n", RED, ping->packets_sent - 1, RESET);
+            // par defaut cest 10s (dans le header ping)
+            if((ping->mode & OPT_COUNT) && is_timeout(&start_time, ping->time_select)){
+                printf("select didnt receive any packet for %d seconds, exiting...\n", ping->time_select);
+                break;
+            }
             continue;
         }
         else

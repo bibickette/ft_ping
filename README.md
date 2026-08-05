@@ -56,23 +56,32 @@ sudo ./ft_ping -v localhost
 sudo ./ft_ping 8.8.8.8
 sudo ./ft_ping google.com
 
+double ping
+sudo ./ft_ping google.com
+sudo ./ft_ping localhost
+
 
 package loss
 sudo ./ft_ping -v 10.255.255.1
 
 
 no internet
+sudo ./ft_ping google.com
 
 loss environment
 sudo tc qdisc add dev lo root netem loss 30%
+sudo ./ft_ping localhost
+
 
 delay environment
+sudo tc qdisc del dev lo root
 sudo tc qdisc add dev lo root netem delay 500ms
 sudo tc qdisc add dev lo root netem delay 100ms 50ms
 sudo tc qdisc add dev lo root netem delay 1500ms
 sudo tc qdisc add dev lo root netem delay 10000ms
+sudo ./ft_ping localhost
 
 duplicate environment
-
+sudo tc qdisc del dev lo root
 sudo tc qdisc add dev lo root netem duplicate 100%
 sudo tc qdisc replace dev lo root netem duplicate 50%

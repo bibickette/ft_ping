@@ -20,7 +20,12 @@ void print_stats(t_ping *ping)
     printf("%ld packets transmitted, %ld received, ", ping->packets_sent, ping->packets_received);
     printf("%ld%% packet loss\n", (ping->packets_sent - ping->packets_received) * 100 / ping->packets_sent);
 
-    double avg_time = ping->rtt.total / ping->packets_received;
+    double avg_time = 0.0;
+    if(ping->packets_received != 0)
+    {
+        avg_time = ping->rtt.total / ping->packets_received;
+    }
+
     double stddev = calculate_stddev(&ping->rtt, ping->packets_received, avg_time);
     printf("round-trip min/avg/max/stddev = ");
     printf("%.3f/", ping->rtt.min);
@@ -36,7 +41,7 @@ int main(int argc, char *argv[])
     memset(&ping, 0, sizeof(t_ping));
 
     ping.size_payload = 56; // default payload size
-    ping.time_for_reply = TIMEOUT_SEC; // default time select
+    ping.time_select = LATE_REPLY; // default time select
 
     parse_opts(argc, argv, &ping);
 
@@ -55,7 +60,7 @@ int main(int argc, char *argv[])
     ret = loop(&ping);
 
     close(ping.socket_fd);
-    
+
     if(ret){
         print_stats(&ping);
     }
@@ -72,6 +77,9 @@ todo:
 - si le paquet a un late delay (10s au max pour aller retour) => perdu : a reregarder
     - W signifie de changer le temps dattente sur select mais ne dit pas que le paquet est perdu, cst si ya rien pdnt 1s
 
+
+PRIORITY :
+- add printf for verbose mode   
 - dupplicata de packet : (peut y en avoir 1 ou +)
 ➜  ft_ping git:(main) ✗ ./inetutils-2.0/ping/ping localhost
 PING localhost (127.0.0.1): 56 data bytes
