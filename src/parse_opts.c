@@ -28,7 +28,10 @@ void parse_opts(int argc, char *argv[], t_ping *ping) {
                 exit(EXIT_FAILURE);
             case 'c':
                 ping->count = atoi(optarg);
-                ping->mode |= OPT_COUNT;
+                if(ping->count > 0)
+                {
+                    ping->mode |= OPT_COUNT;
+                }
                 printf("Option --count with value: %s\n", optarg);
                 break;
             case 'v':

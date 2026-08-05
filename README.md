@@ -85,3 +85,24 @@ duplicate environment
 sudo tc qdisc del dev lo root
 sudo tc qdisc add dev lo root netem duplicate 100%
 sudo tc qdisc replace dev lo root netem duplicate 50%
+
+packet not in right order
+sudo tc qdisc add dev lo root netem delay 100ms 1000ms distribution normal
+
+QUE FAIT -W EXACTEMENT ?
+Timeout pour select, si rien ne se passe apres -W secondes, le programme s'arrete
+si des paquets continue d'etre envoyés, le programme continue et les recoit
+si il y a -c, le programme sarreter apres -c paquet envoyé puis -W s attendue
+COMMENT TESTER ?
+sudo tc qdisc add dev lo root netem delay 15000ms
+offre un delay aller 15s + retour 15s sur le reseau
+le -W de base est de 10s
+pour tester correctement, il faut envoyer un nombre de paquet exemple 1
+
+./inetutils-2.0/ping/ping -c 1 localhost
+-> le programme va sarreter a 10s (W de base), il naura pas le temps de recevoir le paquet puisquil prends 30s
+./inetutils-2.0/ping/ping -c 1 -W 1 localhost
+-> le programme va sarreter a 1s, car le select attendra 1s et ne recevra rien
+./inetutils-2.0/ping/ping -W 1 localhost
+-> le programme recoit les ping en delay et cest > à 1s
+

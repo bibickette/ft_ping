@@ -50,7 +50,7 @@ bool send_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *sequence_numb
         perror("sendto failed");
         return false;
     }
+    printf("%s%ld Sent %d bytes to %s : payload = %zu ; icmphdr = %zu %s\n", YELLOW, *sequence_number, result, dest, sizeof(packet.payload), sizeof(struct icmphdr), RESET);
     (*sequence_number)++;
-    printf("%sSent %d bytes to %s : payload = %zu ; icmphdr = %zu %s\n", YELLOW, result, dest, sizeof(packet.payload), sizeof(struct icmphdr), RESET);
     return true;
 }
