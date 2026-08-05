@@ -50,6 +50,7 @@ typedef struct s_ping
     unsigned long size_payload;
 
     uint16_t sequence_number;
+    uint16_t duplicates;
 
     ssize_t packets_sent;
     ssize_t packets_received;

@@ -50,7 +50,7 @@ bool send_packet(t_ping *ping, struct timeval *start_time)
         perror("sendto failed");
         return false;
     }
-    printf("%s%u Sent %d bytes to %s : payload = %zu ; icmphdr = %zu %s\n", YELLOW, ping->sequence_number, result, ping->dest, sizeof(packet.payload), sizeof(struct icmphdr), RESET);
+    // printf("%s%u Sent %d bytes to %s : payload = %zu ; icmphdr = %zu %s\n", YELLOW, ping->sequence_number, result, ping->dest, sizeof(packet.payload), sizeof(struct icmphdr), RESET);
     ping->sequence_number++;
     ping->packets_sent++;
     return true;

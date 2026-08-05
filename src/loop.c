@@ -34,7 +34,7 @@ void resolve_destination(t_ping *ping)
     memmove(&ping->addr, res->ai_addr, sizeof(struct sockaddr_in));
     freeaddrinfo(res);
 
-    printf("%sPING %s (%s): %lu bytes of data", GREEN, ping->dest, inet_ntoa(ping->addr.sin_addr), ping->size_payload);
+    printf("PING %s (%s): %lu bytes of data", ping->dest, inet_ntoa(ping->addr.sin_addr), ping->size_payload);
     if(ping->mode & OPT_VERBOSE)
     {
         int pid = getpid() & 0xFFFF;
@@ -42,7 +42,7 @@ void resolve_destination(t_ping *ping)
     }
     else{
 
-        printf(".\n%s", RESET);
+        printf(".\n");
     }
     ping->socket_fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
     if (ping->socket_fd < 0)
@@ -130,6 +130,9 @@ bool loop(t_ping *ping)
             if (!receive_packet(ping, &end_time))
             {
                 return false;
+            }
+            if(ping->packets_received == ping->count){
+                break;
             }
         }
     }
