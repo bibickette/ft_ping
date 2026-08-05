@@ -74,20 +74,20 @@ sudo ./ft_ping localhost
 
 
 delay environment
-sudo tc qdisc del dev lo root
 sudo tc qdisc add dev lo root netem delay 500ms
 sudo tc qdisc add dev lo root netem delay 100ms 50ms
 sudo tc qdisc add dev lo root netem delay 1500ms
 sudo tc qdisc add dev lo root netem delay 10000ms
-sudo ./ft_ping localhost
 
 duplicate environment
-sudo tc qdisc del dev lo root
 sudo tc qdisc add dev lo root netem duplicate 100%
 sudo tc qdisc replace dev lo root netem duplicate 50%
 
 packet not in right order
 sudo tc qdisc add dev lo root netem delay 100ms 1000ms distribution normal
+
+
+
 
 QUE FAIT -W EXACTEMENT ?
 Timeout pour select, si rien ne se passe apres -W secondes, le programme s'arrete

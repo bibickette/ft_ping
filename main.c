@@ -9,7 +9,7 @@ double calculate_stddev(t_rtt *rtt, ssize_t packets_received, double avg_time)
     }
     double variance = (rtt->total_squared / packets_received) - (avg_time * avg_time);
     if( variance < 0.0) {
-        variance = 0.0; // Prevent negative variance due to floating-point errors
+        variance = 0.0;
     }
     return sqrt(variance);
 }
@@ -81,6 +81,8 @@ todo:
 PRIORITY :
 - add printf for verbose mode   
 - dupplicata de packet : (peut y en avoir 1 ou +)
+-> la sequence est un uint16_t donc elle peut se reinitialiser a 0 apres 65535
+
 ➜  ft_ping git:(main) ✗ ./inetutils-2.0/ping/ping localhost
 PING localhost (127.0.0.1): 56 data bytes
 64 bytes from 127.0.0.1: icmp_seq=0 ttl=82 time=0.149 ms

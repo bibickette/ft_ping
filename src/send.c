@@ -24,7 +24,7 @@ unsigned short calculate_checksum(unsigned short *data, int count)
     return (unsigned short)~sum;
 }
 
-bool send_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *sequence_number, char *dest, struct timeval *start_time)
+bool send_packet(t_ping *ping, struct timeval *start_time)
 {
     struct ping_packet
     {
@@ -37,20 +37,21 @@ bool send_packet(int socket_fd, struct sockaddr_in *addr, ssize_t *sequence_numb
             .type = ICMP_ECHO,
             .code = 0,
             .checksum = 0,
-            .un = {.echo = {.id = htons(getpid() & 0xffff), .sequence = htons(*sequence_number)}}},
+            .un = {.echo = {.id = htons(getpid() & 0xffff), .sequence = htons(ping->sequence_number)}}},
         .payload = {0}
     };
     gettimeofday(start_time, NULL);
     memmove((char *)&packet + sizeof(struct icmphdr), start_time, sizeof(*start_time)); // Copy the start time into the payload
     packet.icmp_hdr.checksum = calculate_checksum((unsigned short *)&packet, sizeof(packet));
 
-    int result = sendto(socket_fd, &packet, sizeof(packet), 0, (struct sockaddr *)addr, sizeof(*addr));
+    int result = sendto(ping->socket_fd, &packet, sizeof(packet), 0, (struct sockaddr *)&ping->addr, sizeof(ping->addr));
     if (result < 0)
     {
         perror("sendto failed");
         return false;
     }
-    printf("%s%ld Sent %d bytes to %s : payload = %zu ; icmphdr = %zu %s\n", YELLOW, *sequence_number, result, dest, sizeof(packet.payload), sizeof(struct icmphdr), RESET);
-    (*sequence_number)++;
+    printf("%s%u Sent %d bytes to %s : payload = %zu ; icmphdr = %zu %s\n", YELLOW, ping->sequence_number, result, ping->dest, sizeof(packet.payload), sizeof(struct icmphdr), RESET);
+    ping->sequence_number++;
+    ping->packets_sent++;
     return true;
 }

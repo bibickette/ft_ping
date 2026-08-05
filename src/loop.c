@@ -80,7 +80,7 @@ bool loop(t_ping *ping)
     struct timeval timeout, start_time, end_time;
     int res = 0;
 
-    if (!send_packet(ping->socket_fd, &ping->addr, &ping->packets_sent, ping->dest, &start_time))
+    if (!send_packet(ping, &start_time))
     {
         return false;
     }
@@ -96,7 +96,7 @@ bool loop(t_ping *ping)
         {
             if(!(ping->mode & OPT_COUNT) || ping->packets_sent < ping->count)
             {
-                if (!send_packet(ping->socket_fd, &ping->addr, &ping->packets_sent, ping->dest, &start_time))
+                if (!send_packet(ping, &start_time))
                 {
                     return false;
                 }

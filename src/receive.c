@@ -12,10 +12,10 @@ static bool verify_checksum(struct icmphdr *receive_data, int icmp_len)
     return calculated_checksum == 0;
 }
 
-static bool is_sequence_expected(struct icmphdr *receive_data, ssize_t *packets_sent)
-{
-    return ntohs(receive_data->un.echo.sequence) < *packets_sent;
-}
+// static bool is_sequence_expected(struct icmphdr *receive_data, ssize_t *packets_sent)
+// {
+//     return ntohs(receive_data->un.echo.sequence) < *packets_sent;
+// }
 
 static bool is_addr_match(struct sockaddr_in *addr, struct sockaddr_in *recv_addr)
 {
@@ -76,10 +76,10 @@ bool receive_packet(t_ping *ping, struct timeval *end_time)
         printf("Received an echo reply not for me, ignoring...\n");
         return true;
     }
-    if(!is_sequence_expected(icmp, &ping->packets_sent)){
-        printf("Received an echo reply with unexpected sequence number, ignoring...\n");
-        return true;
-    }
+    // if(!is_sequence_expected(icmp, &ping->packets_sent)){
+    //     printf("Received an echo reply with unexpected sequence number, ignoring...\n");
+    //     return true;
+    // }
     if(!is_addr_match(&ping->addr, &recv_addr)){
         printf("Received an echo reply from unexpected source, ignoring...\n");
         return true;
