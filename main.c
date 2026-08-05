@@ -1,6 +1,34 @@
 #include "ft_ping.h"
 #include <math.h>
 
+double calculate_stddev(t_rtt *rtt, ssize_t packets_received, double avg_time)
+{
+    if (packets_received == 0)
+    {
+        return 0.0;
+    }
+    double variance = (rtt->total_squared / packets_received) - (avg_time * avg_time);
+    if( variance < 0.0) {
+        variance = 0.0; // Prevent negative variance due to floating-point errors
+    }
+    return sqrt(variance);
+}
+
+void print_stats(t_ping *ping)
+{
+    printf("--- %s ping statistics ---\n", ping->dest);
+    printf("%ld packets transmitted, %ld received, ", ping->packets_sent, ping->packets_received);
+    printf("%ld%% packet loss\n", (ping->packets_sent - ping->packets_received) * 100 / ping->packets_sent);
+
+    double avg_time = ping->rtt.total / ping->packets_received;
+    double stddev = calculate_stddev(&ping->rtt, ping->packets_received, avg_time);
+    printf("round-trip min/avg/max/stddev = ");
+    printf("%.3f/", ping->rtt.min);
+    printf("%.3f/", avg_time);
+    printf("%.3f/", ping->rtt.max);
+    printf("%.3f ms\n", stddev);
+}
+
 int main(int argc, char *argv[])
 {
 
@@ -8,7 +36,7 @@ int main(int argc, char *argv[])
     memset(&ping, 0, sizeof(t_ping));
 
     ping.size_payload = 56; // default payload size
-    ping.time_for_reply = LATE_REPLY; // default time to wait for a reply
+    ping.time_for_reply = TIMEOUT_SEC; // default time select
 
     parse_opts(argc, argv, &ping);
 
@@ -22,34 +50,24 @@ int main(int argc, char *argv[])
         printf("Count mode enabled\n");
     }
 
+    int ret = 0;
 
-    if(!loop(&ping)){
-        if(ping.socket_fd >= 0){
-            close(ping.socket_fd);
-        }
-        return 1;
-    }
+    ret = loop(&ping);
+
+    close(ping.socket_fd);
     
-    if (ping.socket_fd >= 0){
-        close(ping.socket_fd);
-        printf("--- %s ping statistics ---\n", ping.dest);
-        printf("%ld packets transmitted, %ld received, ", ping.packets_sent, ping.packets_received);
-        printf("%ld%% packet loss\n", (ping.packets_sent - ping.packets_received) * 100 / ping.packets_sent);
-        double sqrt_total = ping.rtt.total * ping.rtt.total;
-        double avg_time = ping.rtt.total / ping.packets_received;
-        double variance = (sqrt_total / ping.packets_received) - (avg_time * avg_time);
-        if( variance < 0.0) {
-            variance = 0.0; // Prevent negative variance due to floating-point errors
-        }
-        double stddev = sqrt(variance);
-        printf("round-trip min/avg/max/stddev = %.3f/%.3f/%.3f/%.3f ms\n", ping.rtt.min, avg_time, ping.rtt.max, stddev);
+    if(ret){
+        print_stats(&ping);
     }
 
-    printf("\n%sExiting ft_ping...%s\n", YELLOW, RESET);
     return 0;
 }
 
 /*
+-W -> timeout select
+-w -> timeout du programme
+-c -> nombre de paquets a envoyer
+
 todo:
 - si le paquet a un late delay (10s au max pour aller retour) => perdu : a reregarder
     - W signifie de changer le temps dattente sur select mais ne dit pas que le paquet est perdu, cst si ya rien pdnt 1s
@@ -65,6 +83,8 @@ PING localhost (127.0.0.1): 56 data bytes
 ^C--- localhost ping statistics ---
 3 packets transmitted, 3 packets received, +2 duplicates, 0% packet loss
 round-trip min/avg/max/stddev = 0.052/0.115/0.197/0.054 ms
+
+
 
 test idea :
 OK : ./ft_ping unknown-domain-xyz

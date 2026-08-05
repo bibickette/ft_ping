@@ -78,8 +78,6 @@ bool loop(t_ping *ping)
     fd_set read_fds;
 
     struct timeval timeout, start_time, end_time;
-    timeout.tv_sec = TIMEOUT_SEC;
-    timeout.tv_usec = 0;
     int res = 0;
 
     if (!send_packet(ping->socket_fd, &ping->addr, &ping->packets_sent, ping->dest, &start_time))
@@ -90,6 +88,9 @@ bool loop(t_ping *ping)
     {
         FD_ZERO(&read_fds);
         FD_SET(ping->socket_fd, &read_fds);
+        
+        timeout.tv_sec = ping->time_for_reply;
+        timeout.tv_usec = 0;
 
         if (is_timeout(&start_time))
         {
@@ -108,7 +109,14 @@ bool loop(t_ping *ping)
             perror("select failed");
             return false;
         }
-        if (res > 0)
+        else if(res == 0)
+        {
+            // timeout du select => correspond au flag -W
+            // -W ne controle pas si laller retour est > a timeout, cest juste pour le select
+            // printf("%sRequest timeout for icmp_seq %ld%s\n", RED, ping->packets_sent - 1, RESET);
+            continue;
+        }
+        else
         {
             if (!receive_packet(ping, &end_time))
             {

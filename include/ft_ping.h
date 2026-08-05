@@ -32,6 +32,8 @@ typedef struct s_rtt
     double min;
     double max;
     double total;
+    double total_squared; // for variance calculation
+    
 } t_rtt;
 
 typedef struct s_ping

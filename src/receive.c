@@ -43,6 +43,7 @@ void fill_rtt(t_rtt *rtt, double time_packet)
         rtt->max = time_packet;
     }
     rtt->total += time_packet;
+    rtt->total_squared += time_packet * time_packet;
 }
 
 bool receive_packet(t_ping *ping, struct timeval *end_time)
