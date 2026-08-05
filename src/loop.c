@@ -116,7 +116,7 @@ bool loop(t_ping *ping)
             // si select recoit rien depuis X temps ET si on a pas de count alors on continue
             // -W peut changer ce temps
             // -W ne controle pas si laller retour est > a timeout, cest juste pour le select
-            // par defaut cest 10s (dans le header ping)
+            // inetutils-2.0/ping/ping_common.h:#define MAXWAIT         10     /* Max seconds to wait for response.  */
             if((ping->mode & OPT_COUNT) && is_timeout(&start_time, ping->time_select)){
                 printf("select didnt receive any packet for %d seconds, exiting...\n", ping->time_select);
                 break;

@@ -99,15 +99,10 @@ bool receive_packet(t_ping *ping, struct timeval *end_time)
         // mettre le time de l'envoi dans le payload et le recupere ici pour calculer le rtt
         memmove(payload, buffer + ip_hdr->ihl * 4 + sizeof(struct icmphdr), sizeof(payload));
         struct timeval *sent_time = (struct timeval *)payload;
-        // inetutils-2.0/ping/ping_common.h:#define MAXWAIT         10     /* Max seconds to wait for response.  */
-        // si le  paquet est recu apres 10s il est considere comme perdu et on ne le prend pas en compte pour le calcul du rtt
 
         gettimeofday(end_time, NULL);
         double time_packet = (end_time->tv_sec - sent_time->tv_sec) * 1000.0 + (end_time->tv_usec - sent_time->tv_usec) / 1000.0;
-        // if(time_packet > ping->time_for_reply * 1000.0){
-        //     printf("Received an echo reply after %.3f ms, ignoring...\n", time_packet);
-        //     return true;
-        // }
+
         fill_rtt(&ping->rtt, time_packet);
         ping->packets_received++;
         printf("%s%d bytes from %s: ", GREEN, result - ip_hdr->ihl * 4, inet_ntoa(recv_addr.sin_addr));
