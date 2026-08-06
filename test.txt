@@ -1,0 +1,86 @@
+➜  ft_ping git:(main) ✗ sudo tc qdisc replace dev lo root netem duplicate 50% delay 10000ms
+
+
+➜  ft_ping git:(main) ✗ ping -W 1 -c 10 localhost
+PING localhost (127.0.0.1): 56 data bytes
+--- localhost ping statistics ---
+10 packets transmitted, 0 packets received, 100% packet loss
+
+=> a attendu 10 packets + 1s
+
+
+➜  ft_ping git:(main) ✗ ping -c 10 localhost 
+PING localhost (127.0.0.1): 56 data bytes
+64 bytes from 127.0.0.1: icmp_seq=0 ttl=64 time=20000.289 ms
+64 bytes from 127.0.0.1: icmp_seq=0 ttl=64 time=20000.328 ms (DUP!)
+--- localhost ping statistics ---
+10 packets transmitted, 1 packets received, +1 duplicates, 90% packet loss
+round-trip min/avg/max/stddev = 20000.289/20000.308/20000.328/0.000 ms
+=> a attendu 10 packets + 10s 
+
+➜  ft_ping git:(main) ✗ make && sudo ./ft_ping -c 10 localhost
+Option --count with value: 10
+PING localhost (127.0.0.1): 56 bytes of data.
+64 bytes from 127.0.0.1: icmp_seq=0 ttl=64 rtt=20000.322 ms
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 rtt=20000.276 ms
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 rtt=20000.347 ms (DUP!)
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 rtt=20000.359 ms (DUP!)
+Nothing happened for 10 seconds, exiting...
+--- localhost ping statistics ---
+10 packets transmitted, 2 received, +2 duplicates, 80% packet loss
+round-trip min/avg/max/stddev = 20000.276/20000.299/20000.322/0.023 ms
+=> a attendu 10 packets + 10s 
+
+
+
+➜  ft_ping git:(main) ✗ sudo tc qdisc replace dev lo root netem duplicate 50% delay 11000ms
+➜  ft_ping git:(main) ✗ ping -c 10 localhost
+PING localhost (127.0.0.1): 56 data bytes
+--- localhost ping statistics ---
+10 packets transmitted, 0 packets received, 100% packet loss
+➜  ft_ping git:(main) ✗ make && sudo ./ft_ping -c 10 localhost
+make: Nothing to be done for 'all'.
+Option --count with value: 10
+PING localhost (127.0.0.1): 56 bytes of data.
+Nothing happened for 10 seconds, exiting...
+--- localhost ping statistics ---
+10 packets transmitted, 0 received, 100% packet loss
+round-trip min/avg/max/stddev = 0.000/0.000/0.000/0.000 ms
+=> je fais pareil
+
+➜  ft_ping git:(main) ✗ sudo tc qdisc replace dev lo root netem duplicate 50% delay 5000ms 
+➜  ft_ping git:(main) ✗ ping -c 10 localhost
+PING localhost (127.0.0.1): 56 data bytes
+64 bytes from 127.0.0.1: icmp_seq=0 ttl=64 time=10000.311 ms
+64 bytes from 127.0.0.1: icmp_seq=0 ttl=64 time=10000.408 ms (DUP!)
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 time=10000.258 ms
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 time=10000.334 ms (DUP!)
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 time=10000.348 ms (DUP!)
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 time=10000.401 ms (DUP!)
+64 bytes from 127.0.0.1: icmp_seq=2 ttl=64 time=10000.502 ms
+64 bytes from 127.0.0.1: icmp_seq=2 ttl=64 time=10000.608 ms (DUP!)
+64 bytes from 127.0.0.1: icmp_seq=3 ttl=64 time=10000.302 ms
+64 bytes from 127.0.0.1: icmp_seq=3 ttl=64 time=10000.390 ms (DUP!)
+--- localhost ping statistics ---
+10 packets transmitted, 4 packets received, +6 duplicates, 60% packet loss
+round-trip min/avg/max/stddev = 10000.258/10000.386/10000.608/0.098 ms
+➜  ft_ping git:(main) ✗ sudo ./ft_ping -c 10 localhost       
+Option --count with value: 10
+PING localhost (127.0.0.1): 56 bytes of data.
+64 bytes from 127.0.0.1: icmp_seq=0 ttl=64 rtt=10000.254 ms
+64 bytes from 127.0.0.1: icmp_seq=0 ttl=64 rtt=10000.328 ms (DUP!)
+64 bytes from 127.0.0.1: icmp_seq=0 ttl=64 rtt=10000.342 ms (DUP!)
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 rtt=10000.305 ms
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 rtt=10000.419 ms (DUP!)
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 rtt=10000.465 ms (DUP!)
+64 bytes from 127.0.0.1: icmp_seq=2 ttl=64 rtt=10000.324 ms
+64 bytes from 127.0.0.1: icmp_seq=2 ttl=64 rtt=10000.382 ms (DUP!)
+64 bytes from 127.0.0.1: icmp_seq=3 ttl=64 rtt=10000.410 ms
+64 bytes from 127.0.0.1: icmp_seq=3 ttl=64 rtt=10000.476 ms (DUP!)
+count = 10 reached, exiting...
+Sent 10 packets, received 4 packets, exiting...
+duplicates = 6
+--- localhost ping statistics ---
+10 packets transmitted, 4 received, +6 duplicates, 60% packet loss
+round-trip min/avg/max/stddev = 10000.254/10000.323/10000.410/0.056 ms
+=> je fais pareil

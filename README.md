@@ -354,3 +354,7 @@ delay	Ajouter un délai
 Et pour remettre lo comme avant :
 
 sudo tc qdisc del dev lo root
+
+
+
+on remarque que ping count cest package sent and package received + duplicata

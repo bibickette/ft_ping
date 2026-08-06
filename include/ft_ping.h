@@ -20,6 +20,11 @@
 #define TIMEOUT_SEC 1
 /* time to wait for a reply */
 #define LATE_REPLY 10
+/* maximum number of received sequence numbers to save, permet to control duplicates */
+#define MAX_RECV_SEQ_SAVE 1024
+
+/* buffer size to receive */
+#define RECV_BUFFER_SIZE 1024
 
 enum arg_opt
 {
@@ -42,14 +47,17 @@ typedef struct s_ping
 
     char *dest;
     int socket_fd;
-
+    /* flags */
     int mode;
-    int count;
-
+    ssize_t count;
     int time_select;
-    unsigned long size_payload;
 
+    unsigned long size_payload;
+    /* garder le sequence number dans un uint16 car cest le type du paquet de sequence, donc quand on envoie  > uint16 seq il reboucle*/
     uint16_t sequence_number;
+    /* tableau pour suivre les séquences reçues pour controler les dupplicate*/
+    bool sequence_received[MAX_RECV_SEQ_SAVE];
+
     uint16_t duplicates;
 
     ssize_t packets_sent;
@@ -73,6 +81,7 @@ bool send_packet(t_ping *ping, struct timeval *start_time);
 
 /*  receive.c */
 bool receive_packet(t_ping *ping, struct timeval *end_time);
+bool is_duplicate(t_ping *ping, uint16_t sequence_number);
 
 
 #endif

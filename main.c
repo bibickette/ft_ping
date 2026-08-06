@@ -28,10 +28,10 @@ void print_stats(t_ping *ping)
     double avg_time = 0.0;
     if (ping->packets_received != 0)
     {
-        avg_time = ping->rtt.total / ping->packets_received;
+        avg_time = ping->rtt.total / (ping->packets_received + ping->duplicates);
     }
 
-    double stddev = calculate_stddev(&ping->rtt, ping->packets_received, avg_time);
+    double stddev = calculate_stddev(&ping->rtt, ping->packets_received + ping->duplicates, avg_time);
     printf("round-trip min/avg/max/stddev = ");
     printf("%.3f/", ping->rtt.min);
     printf("%.3f/", avg_time);
@@ -47,7 +47,6 @@ int main(int argc, char *argv[])
 
     ping.size_payload = 56;        // default payload size
     ping.time_select = LATE_REPLY; // default time select
-    ping.count = -1;                // default count (no limit)
 
     parse_opts(argc, argv, &ping);
 

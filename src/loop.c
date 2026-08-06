@@ -94,8 +94,7 @@ bool loop(t_ping *ping)
 
         if (is_timeout(&start_time, TIMEOUT_SEC))
         {
-            if(!(ping->mode & OPT_COUNT) || ping->packets_sent < ping->count)
-            {
+            if(ping->count == 0 || ping->count > ping->packets_sent){
                 if (!send_packet(ping, &start_time))
                 {
                     return false;
@@ -119,7 +118,7 @@ bool loop(t_ping *ping)
             // -W peut changer ce temps
             // -W ne controle pas si laller retour est > a timeout, cest juste pour le select
             // inetutils-2.0/ping/ping_common.h:#define MAXWAIT         10     /* Max seconds to wait for response.  */
-            if((ping->mode & OPT_COUNT && ping->count == ping->packets_sent) && is_timeout(&start_time, ping->time_select)){
+            if(is_timeout(&start_time, ping->time_select)){
                 printf("Nothing happened for %d seconds, exiting...\n", ping->time_select);
                 break;
             }
@@ -131,7 +130,7 @@ bool loop(t_ping *ping)
             {
                 return false;
             }
-            if(ping->packets_received == ping->count){
+            if(ping->count > 0 && ping->count <= (ping->packets_received + ping->duplicates)){
                 break;
             }
         }

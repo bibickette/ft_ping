@@ -12,11 +12,6 @@ static bool verify_checksum(struct icmphdr *receive_data, int icmp_len)
     return calculated_checksum == 0;
 }
 
-// static bool is_sequence_expected(struct icmphdr *receive_data, ssize_t *packets_sent)
-// {
-//     return ntohs(receive_data->un.echo.sequence) < *packets_sent;
-// }
-
 static bool is_addr_match(struct sockaddr_in *addr, struct sockaddr_in *recv_addr)
 {
     return addr->sin_addr.s_addr == recv_addr->sin_addr.s_addr;
@@ -54,14 +49,19 @@ enum packet_error
     ERR_CHECKSUM_INVALID = 4,
 };
 
+bool is_duplicate(t_ping *ping, uint16_t sequence_number)
+{
+    return ping->sequence_received[sequence_number % MAX_RECV_SEQ_SAVE];
+}
+
 bool receive_packet(t_ping *ping, struct timeval *end_time)
 {
-    // receive packet
-    char buffer[1024] = {0};
+    char buffer[RECV_BUFFER_SIZE] = {0};
+    /* garder dans un autre sockaddr_in car il peut overwrite mon addr source sinon */
     struct sockaddr_in recv_addr = ping->addr;
     socklen_t recv_addr_len = sizeof(recv_addr);
 
-    int result = recvfrom(ping->socket_fd, buffer, 1024, 0, (struct sockaddr *)&recv_addr, &recv_addr_len);
+    int result = recvfrom(ping->socket_fd, buffer, RECV_BUFFER_SIZE, 0, (struct sockaddr *)&recv_addr, &recv_addr_len);
     if (result < 0)
     {
         perror("recvfrom failed");
@@ -85,10 +85,6 @@ bool receive_packet(t_ping *ping, struct timeval *end_time)
     {
         error = ERR_NOT_MY_PID;
     }
-    // if(!is_sequence_expected(icmp, &ping->packets_sent)){
-    //     printf("Received an echo reply with unexpected sequence number, ignoring...\n");
-    //     return true;
-    // }
     else if (!is_addr_match(&ping->addr, &recv_addr))
     {
         error = ERR_ADDR_MISMATCH;
@@ -100,11 +96,11 @@ bool receive_packet(t_ping *ping, struct timeval *end_time)
 
     if (error)
     {
-        if(!(ping->mode & OPT_VERBOSE) && error != ERR_CHECKSUM_INVALID)
+        if (!(ping->mode & OPT_VERBOSE) && error != ERR_CHECKSUM_INVALID)
         {
             return true;
         }
-        else if(ping->mode & OPT_VERBOSE && error != ERR_CHECKSUM_INVALID)
+        else if (ping->mode & OPT_VERBOSE && error != ERR_CHECKSUM_INVALID)
         {
             switch (error)
             {
@@ -118,10 +114,10 @@ bool receive_packet(t_ping *ping, struct timeval *end_time)
                 // keep in a buffer the expected and received sequence numbers and IP addresses for debugging purposes
                 char expected_ip[INET_ADDRSTRLEN];
                 char received_ip[INET_ADDRSTRLEN];
-    
+
                 inet_ntop(AF_INET, &ping->addr.sin_addr,
                           expected_ip, sizeof(expected_ip));
-    
+
                 inet_ntop(AF_INET, &recv_addr.sin_addr,
                           received_ip, sizeof(received_ip));
                 printf("%secho reply from unexpected ip : %s - source : %s%s\n", YELLOW, received_ip, expected_ip, RESET);
@@ -147,16 +143,17 @@ bool receive_packet(t_ping *ping, struct timeval *end_time)
     printf("icmp_seq=%u ", ntohs(icmp->un.echo.sequence));
     printf("ttl=%u ", ip_hdr->ttl);
     printf("rtt=%.3f ms", time_packet);
-    // if (is_duplicate ntohs(icmp->un.echo.sequence))
-    // {
-    //     printf(" (DUP!)");
-    //     ping->duplicates++;
-    // }
-    // else{
+    if (is_duplicate(ping, ntohs(icmp->un.echo.sequence)))
+    {
+        printf(" (DUP!)");
+        ping->duplicates++;
+    }
+    else
+    {
+        ping->packets_received++;
+        ping->sequence_received[ntohs(icmp->un.echo.sequence) % MAX_RECV_SEQ_SAVE] = true;
+    }
     fill_rtt(&ping->rtt, time_packet);
-    ping->packets_received++;
-
-    // }
     printf("\n");
     // }
     // else{
