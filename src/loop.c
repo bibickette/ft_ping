@@ -35,24 +35,25 @@ void resolve_destination(t_ping *ping)
     freeaddrinfo(res);
 
     printf("PING %s (%s): %lu bytes of data", ping->dest, inet_ntoa(ping->addr.sin_addr), ping->size_payload);
-    if(ping->mode & OPT_VERBOSE)
+    if (ping->mode & OPT_VERBOSE)
     {
         int pid = getpid() & 0xFFFF;
         printf(", id 0x%x = %i\n", pid, pid);
     }
-    else{
+    else
+    {
 
         printf(".\n");
     }
     ping->socket_fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
     if (ping->socket_fd < 0)
     {
-        perror("socket creation failed");
+        perror("socket creation failed : ");
         exit(EXIT_FAILURE);
     }
 }
 
-// calcul si le current time - start time est > 1 seconde
+/* calcul si le current time - start time est > timeout_sec */ 
 bool is_timeout(struct timeval *start_time, int timeout_sec)
 {
     struct timeval current_time;
@@ -88,13 +89,14 @@ bool loop(t_ping *ping)
     {
         FD_ZERO(&read_fds);
         FD_SET(ping->socket_fd, &read_fds);
-        
+
         timeout.tv_sec = TIMEOUT_SEC;
         timeout.tv_usec = 0;
 
         if (is_timeout(&start_time, TIMEOUT_SEC))
         {
-            if(ping->count == 0 || ping->count > ping->packets_sent){
+            if (ping->count == 0 || ping->count > ping->packets_sent)
+            {
                 if (!send_packet(ping, &start_time))
                 {
                     return false;
@@ -111,14 +113,15 @@ bool loop(t_ping *ping)
             perror("select failed");
             return false;
         }
-        else if(res == 0)
+        else if (res == 0)
         {
             // si select na pas recu de paquet pendant -W temps -> alors cest la fin SI on nenvoie pu de paquet
             // si select recoit rien depuis X temps ET si on a pas de count alors on continue
             // -W peut changer ce temps
             // -W ne controle pas si laller retour est > a timeout, cest juste pour le select
             // inetutils-2.0/ping/ping_common.h:#define MAXWAIT         10     /* Max seconds to wait for response.  */
-            if(is_timeout(&start_time, ping->time_select)){
+            if (is_timeout(&start_time, ping->time_select))
+            {
                 printf("Nothing happened for %d seconds, exiting...\n", ping->time_select);
                 break;
             }
@@ -130,7 +133,8 @@ bool loop(t_ping *ping)
             {
                 return false;
             }
-            if(ping->count > 0 && ping->count <= (ping->packets_received + ping->duplicates)){
+            if (ping->count > 0 && ping->count <= (ping->packets_received + ping->duplicates))
+            {
                 break;
             }
         }

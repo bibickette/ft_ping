@@ -25,11 +25,12 @@
 
 /* buffer size to receive */
 #define RECV_BUFFER_SIZE 1024
+/* payload size in icmp packet */
+#define PAYLOAD_SIZE 56
 
 enum arg_opt
 {
     OPT_VERBOSE  = 1 << 0,
-    OPT_COUNT    = 1 << 1,
 };
 
 typedef struct s_rtt

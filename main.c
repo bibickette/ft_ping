@@ -45,7 +45,6 @@ int main(int argc, char *argv[])
     t_ping ping;
     memset(&ping, 0, sizeof(t_ping));
 
-    ping.size_payload = 56;        // default payload size
     ping.time_select = LATE_REPLY; // default time select
 
     parse_opts(argc, argv, &ping);
@@ -71,74 +70,6 @@ int main(int argc, char *argv[])
 /*
 -W -> timeout select
 -w -> timeout du programme
--c -> nombre de paquets a envoyer
-
-todo:
-- si le paquet a un late delay (10s au max pour aller retour) => perdu : a reregarder
-    - W signifie de changer le temps dattente sur select mais ne dit pas que le paquet est perdu, cst si ya rien pdnt 1s
-
-
-PRIORITY :
-- add printf for verbose mode
-- dupplicata de packet : (peut y en avoir 1 ou +)
--> la sequence est un uint16_t donc elle peut se reinitialiser a 0 apres 65535
-
-➜  ft_ping git:(main) ✗ ./inetutils-2.0/ping/ping localhost
-PING localhost (127.0.0.1): 56 data bytes
-64 bytes from 127.0.0.1: icmp_seq=0 ttl=82 time=0.149 ms
-64 bytes from 127.0.0.1: icmp_seq=0 ttl=82 time=0.197 ms (DUP!)
-64 bytes from 127.0.0.1: icmp_seq=1 ttl=83 time=0.052 ms
-64 bytes from 127.0.0.1: icmp_seq=1 ttl=83 time=0.111 ms (DUP!)
-64 bytes from 127.0.0.1: icmp_seq=2 ttl=84 time=0.065 ms
-^C--- localhost ping statistics ---
-3 packets transmitted, 3 packets received, +2 duplicates, 0% packet loss
-round-trip min/avg/max/stddev = 0.052/0.115/0.197/0.054 ms
-
-CORRUPTION :
-➜  ft_ping git:(main) ✗ sudo tc qdisc add dev lo root netem corrupt 50%
-➜  ft_ping git:(main) ✗ ping -v localhost
-PING localhost (127.0.0.1): 56 data bytes, id 0x2104 = 8452
-checksum mismatch from 127.0.0.1
-64 bytes from 127.0.0.1: icmp_seq=2 ttl=64 time=0.142 ms
-64 bytes from 127.0.0.1: icmp_seq=6 ttl=64 time=0.097 ms
-64 bytes from 127.0.0.1: icmp_seq=7 ttl=64 time=0.066 ms
-64 bytes from 127.0.0.1: icmp_seq=8 ttl=64 time=0.075 ms
-64 bytes from 127.0.0.1: icmp_seq=10 ttl=64 time=0.069 ms
-64 bytes from 127.0.0.1: icmp_seq=13 ttl=64 time=0.090 ms
-64 bytes from 127.0.0.1: icmp_seq=14 ttl=64 time=0.068 ms
-64 bytes from 127.0.0.1: icmp_seq=16 ttl=64 time=0.069 ms
-checksum mismatch from 127.0.0.1
-64 bytes from 127.0.0.1: icmp_seq=20 ttl=64 time=0.108 ms
-64 bytes from 127.0.0.1: icmp_seq=24 ttl=64 time=0.086 ms
-64 bytes from 127.0.0.1: icmp_seq=25 ttl=64 time=0.082 ms
-64 bytes from 127.0.0.1: icmp_seq=26 ttl=64 time=0.087 ms
-checksum mismatch from 127.0.0.1
-64 bytes from 127.0.0.1: icmp_seq=28 ttl=64 time=0.091 ms
-checksum mismatch from 127.0.0.1
-64 bytes from 127.0.0.1: icmp_seq=29 ttl=64 time=0.184 ms
-64 bytes from 127.0.0.1: icmp_seq=32 ttl=64 time=0.076 ms
-64 bytes from 127.0.0.1: icmp_seq=35 ttl=64 time=0.084 ms
-checksum mismatch from 127.0.0.1
-64 bytes from 127.0.0.1: icmp_seq=37 ttl=64 time=0.128 ms
-checksum mismatch from 127.0.0.1
-64 bytes from 127.0.0.1: icmp_seq=38 ttl=64 time=0.207 ms
-64 bytes from 127.0.0.1: icmp_seq=39 ttl=64 time=0.121 ms
-64 bytes from 127.0.0.1: icmp_seq=40 ttl=64 time=0.159 ms
-64 bytes from 127.0.0.1: icmp_seq=41 ttl=64 time=0.151 ms
-64 bytes from 127.0.0.1: icmp_seq=42 ttl=64 time=0.054 ms
-
-➜  ft_ping git:(main) ✗ ping -v localhost
-PING localhost (127.0.0.1): 56 data bytes, id 0x2523 = 9507
-checksum mismatch from 127.0.0.1
-64 bytes from 127.0.0.1: icmp_seq=2 ttl=64 time=0.123 ms
-checksum mismatch from 127.0.0.1
-64 bytes from 127.0.0.1: icmp_seq=9 ttl=64 time=-1099511627775999.875 ms
-64 bytes from 127.0.0.1: icmp_seq=19 ttl=64 time=0.095 ms
-checksum mismatch from 127.0.0.1
-64 bytes from 127.0.0.1: icmp_seq=24 ttl=64 time=-1125899906842624000.000 ms
-^C--- localhost ping statistics ---
-35 packets transmitted, 4 packets received, 88% packet loss
-round-trip min/avg/max/stddev = -1125899906842624000.000/-281749854617600000.000/0.123/487370466597508864.000 ms
 
 
 test idea :
