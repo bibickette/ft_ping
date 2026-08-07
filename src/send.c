@@ -37,7 +37,7 @@ bool send_packet(t_ping *ping, struct timeval *start_time)
             .type = ICMP_ECHO,
             .code = 0,
             .checksum = 0,
-            .un = {.echo = {.id = htons(getpid() & 0xffff), .sequence = htons(ping->sequence_number)}}},
+            .un = {.echo = {.id = htons(ping->pid), .sequence = htons(ping->sequence_number)}}},
         .payload = {0}};
         
     gettimeofday(start_time, NULL);

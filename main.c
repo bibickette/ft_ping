@@ -45,12 +45,14 @@ int main(int argc, char *argv[])
     t_ping ping;
     memset(&ping, 0, sizeof(t_ping));
 
-    ping.time_select = LATE_REPLY; // default time select
+    ping.time_select = LATE_REPLY; 
+    ping.pid = getpid() & 0xFFFF;
 
     parse_opts(argc, argv, &ping);
 
-    int ret = 0;
+    ping.time_select += TIMEOUT_SEC; // add the timeout for select to the linger time
 
+    int ret = 0;
     ret = loop(&ping);
 
     close(ping.socket_fd);
@@ -63,7 +65,6 @@ int main(int argc, char *argv[])
     {
         return 1;
     }
-
     return 0;
 }
 

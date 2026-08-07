@@ -37,8 +37,7 @@ void resolve_destination(t_ping *ping)
     printf("PING %s (%s): %u bytes of data", ping->dest, inet_ntoa(ping->addr.sin_addr), PAYLOAD_SIZE);
     if (ping->mode & OPT_VERBOSE)
     {
-        int pid = getpid() & 0xFFFF;
-        printf(", id 0x%x = %i\n", pid, pid);
+        printf(", id 0x%x = %i\n", ping->pid, ping->pid);
     }
     else
     {
@@ -70,12 +69,17 @@ void resolve_destination(t_ping *ping)
 }
 
 /* calcul si le current time - start time est > timeout_sec */ 
-bool is_timeout(struct timeval *start_time, int timeout_sec)
+bool is_timeout(struct timeval *start_time, double timeout_sec)
 {
     struct timeval current_time;
     gettimeofday(&current_time, NULL);
-    long elapsed_time = (current_time.tv_sec - start_time->tv_sec) * 1000 + (current_time.tv_usec - start_time->tv_usec) / 1000;
-    return elapsed_time >= timeout_sec * 1000;
+    double elapsed_time = (current_time.tv_sec - start_time->tv_sec) * 1000 + (current_time.tv_usec - start_time->tv_usec) / 1000;
+    if (elapsed_time >= timeout_sec * 1000)
+    {
+        printf("elapsed time = %.3f ms\n", elapsed_time);
+        return true;
+    }
+    return false;
 }
 
 // fd set
@@ -138,9 +142,17 @@ bool loop(t_ping *ping)
             // inetutils-2.0/ping/ping_common.h:#define MAXWAIT         10     /* Max seconds to wait for response.  */
             if (is_timeout(&start_time, ping->time_select))
             {
-                printf("Nothing happened for %d seconds, exiting...\n", ping->time_select);
+                // -W N correspond au linger : le nombre de secondes pendant lesquelles ping continue d'attendre des réponses après l'envoi des paquets.
+                if(ping->mode & OPT_VERBOSE)
+                {
+                    printf("%sLinger timeout (%d seconds)%s\n", YELLOW, ping->time_select - TIMEOUT_SEC, RESET);
+                }
                 break;
             }
+            // struct timeval current_time;
+            // gettimeofday(&current_time, NULL);
+            // printf("elapsed time select = %d ms\n", (int)((current_time.tv_sec - start_time.tv_sec) * 1000 + (current_time.tv_usec - start_time.tv_usec) / 1000));
+           
             continue;
         }
         else

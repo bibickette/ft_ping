@@ -48,6 +48,8 @@ typedef struct s_ping
 
     char *dest;
     int socket_fd;
+    uint16_t pid;
+    
     /* flags */
     int mode;
     bool socket_dgram;

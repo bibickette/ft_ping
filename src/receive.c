@@ -17,14 +17,14 @@ static bool is_addr_match(struct sockaddr_in *addr, struct sockaddr_in *recv_add
     return addr->sin_addr.s_addr == recv_addr->sin_addr.s_addr;
 }
 
-static bool is_echo_from_myself(struct icmphdr *receive_data)
+static bool is_echo_from_myself(struct icmphdr *receive_data, uint16_t pid)
 {
-    return ((receive_data->type == ICMP_ECHO && receive_data->un.echo.id == htons(getpid() & 0xffff)));
+    return ((receive_data->type == ICMP_ECHO && receive_data->un.echo.id == htons(pid)));
 }
 
-static bool is_my_pid(struct icmphdr *receive_data)
+static bool is_my_pid(struct icmphdr *receive_data, uint16_t pid)
 {
-    return (receive_data->un.echo.id == htons(getpid() & 0xffff));
+    return (receive_data->un.echo.id == htons(pid));
 }
 
 static bool is_socket_dgram(t_ping *ping)
@@ -83,11 +83,11 @@ bool receive_packet(t_ping *ping, struct timeval *end_time)
     // 1. verify type and id
     // 2. verify source address
     // 3. verify checksum
-    if (is_echo_from_myself(icmp))
+    if (is_echo_from_myself(icmp, ping->pid))
     {
         error = ERR_ECHO_FROM_MYSELF;
     }
-    else if (!is_my_pid(icmp) && !is_socket_dgram(ping))
+    else if (!is_my_pid(icmp, ping->pid) && !is_socket_dgram(ping))
     {
         error = ERR_NOT_MY_PID;
     }
@@ -118,7 +118,7 @@ bool receive_packet(t_ping *ping, struct timeval *end_time)
                 printf("%secho request from myself, icmp_seq : %u%s\n", YELLOW, ntohs(icmp->un.echo.sequence), RESET);
                 return true;
             case ERR_NOT_MY_PID:
-                printf("%secho reply from unexpected pid : %d - src pid : %d%s\n", YELLOW, ntohs((uint16_t)icmp->un.echo.id), getpid() & 0xffff, RESET);
+                printf("%secho reply from unexpected pid : %d - src pid : %d%s\n", YELLOW, ntohs((uint16_t)icmp->un.echo.id), ping->pid, RESET);
                 return true;
             case ERR_NOT_ECHOREPLY:
                 printf("%snot an echo reply, icmp type : %d%s\n", YELLOW, icmp->type, RESET);
