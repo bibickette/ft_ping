@@ -27,35 +27,13 @@ void print_destination(t_ping *ping){
     }
 }
 
-void print_privilege(int mode)
-{
-    if (mode & OPT_VERBOSE)
-    {
-        printf("%sRoot privileges required for raw socket, using SOCK_DGRAM instead%s\n", YELLOW, RESET);
-    }
-}
-
-int create_socket(int mode, bool *socket_dgram){
+int create_socket(void){
     int fd = 0;
     fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
     if (fd < 0)
     {
-        if (errno == EPERM || errno == EACCES)
-        {
-            print_privilege(mode);
-            fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_ICMP);
-            if (fd < 0)
-            {
-                perror("socket_dgram creation failed : ");
-                exit(EXIT_FAILURE);
-            }
-            *socket_dgram = true;
-        }
-        else
-        {
             perror("socket_raw creation failed : ");
             exit(EXIT_FAILURE);
-        }
     }
     return fd;
 }
@@ -78,7 +56,7 @@ void resolve_destination(t_ping *ping)
     memmove(&ping->addr, res->ai_addr, sizeof(struct sockaddr_in));
     freeaddrinfo(res);
 
-    ping->socket_fd = create_socket(ping->mode, &ping->socket_dgram);
+    ping->socket_fd = create_socket();
     print_destination(ping);
 }
 

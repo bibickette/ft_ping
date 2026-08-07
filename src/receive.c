@@ -28,11 +28,6 @@ static bool is_my_pid(struct icmphdr *receive_data, uint16_t pid)
     return (receive_data->un.echo.id == htons(pid));
 }
 
-static bool is_socket_dgram(t_ping *ping)
-{
-    return ping->socket_dgram;
-}
-
 bool is_duplicate(t_ping *ping, uint16_t sequence_number)
 {
     return ping->sequence_received[sequence_number % MAX_RECV_SEQ_SAVE];
@@ -90,7 +85,7 @@ bool receive_packet(t_ping *ping, struct timeval *end_time)
     {
         error = ERR_ECHO_FROM_MYSELF;
     }
-    else if (!is_my_pid(icmp, ping->pid) && !is_socket_dgram(ping))
+    else if (!is_my_pid(icmp, ping->pid))
     {
         error = ERR_NOT_MY_PID;
     }
