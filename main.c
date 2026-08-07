@@ -46,10 +46,10 @@ int main(int argc, char *argv[])
     memset(&ping, 0, sizeof(t_ping));
 
     ping.time_select = LATE_REPLY; 
-    ping.pid = getpid() & 0xFFFF;
-
+    
     parse_opts(argc, argv, &ping);
-
+    
+    ping.pid = getpid() & 0xFFFF;
     ping.time_select += TIMEOUT_SEC; // add the timeout for select to the linger time
 
     int ret = 0;
@@ -69,9 +69,11 @@ int main(int argc, char *argv[])
 }
 
 /*
--W -> timeout select
 -w -> timeout du programme
+-i -> interval between each ping
 
+-W ok
+-c ok
 
 test idea :
 OK : ./ft_ping unknown-domain-xyz

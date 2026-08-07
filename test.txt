@@ -96,6 +96,79 @@ round-trip min/avg/max/stddev = 10000.254/10000.323/10000.410/0.056 ms
 
 
 ################################
+➜  ft_ping git:(main) ✗ sudo tc qdisc replace dev lo root netem delay 5200ms  
+➜  ft_ping git:(main) ✗ time ping localhost -c10 -W 1
+PING localhost (127.0.0.1): 56 data bytes
+64 bytes from 127.0.0.1: icmp_seq=0 ttl=64 time=10402.388 ms
+--- localhost ping statistics ---
+10 packets transmitted, 1 packets received, 90% packet loss
+round-trip min/avg/max/stddev = 10402.388/10402.388/10402.388/0.000 ms
+ping localhost -c10 -W 1  0.00s user 0.00s system 0% cpu 11.018 total
+➜  ft_ping git:(main) ✗ time ./ft_ping localhost -c10 -W 1                   
+PING localhost (127.0.0.1): 56 bytes of data.
+64 bytes from 127.0.0.1: icmp_seq=0 ttl=82 rtt=10400.143 ms
+--- localhost ping statistics ---
+10 packets transmitted, 1 received, 90% packet loss
+round-trip min/avg/max/stddev = 10400.143/10400.143/10400.143/0.000 ms
+./ft_ping localhost -c10 -W 1  0.28s user 0.72s system 9% cpu 11.017 total
+
+
+➜  ft_ping git:(main) ✗ sudo tc qdisc replace dev lo root netem delay 15000ms
+➜  ft_ping git:(main) ✗ time ping localhost -c10 -W 1
+PING localhost (127.0.0.1): 56 data bytes
+--- localhost ping statistics ---
+10 packets transmitted, 0 packets received, 100% packet loss
+ping localhost -c10 -W 1  0.01s user 0.01s system 0% cpu 11.028 total
+➜  ft_ping git:(main) ✗ time ./ft_ping localhost -c10 -W 1                    
+PING localhost (127.0.0.1): 56 bytes of data.
+--- localhost ping statistics ---
+10 packets transmitted, 0 received, 100% packet loss
+round-trip min/avg/max/stddev = 0.000/0.000/0.000/0.000 ms
+./ft_ping localhost -c10 -W 1  0.27s user 0.73s system 9% cpu 11.012 total
+######################################################################
+# ENVIRONMENT = sudo tc qdisc replace dev lo root netem delay 1200ms #
+######################################################################
+################################################################
+################################
+# TEST 0 = localhost -W 2 -c10 #
+################################
+# RESULT REAL PING =
+
+➜  ft_ping git:(main) ✗ time ping localhost -c10 -W 1
+PING localhost (127.0.0.1): 56 data bytes
+64 bytes from 127.0.0.1: icmp_seq=0 ttl=64 time=2400.320 ms
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 time=2400.292 ms
+64 bytes from 127.0.0.1: icmp_seq=2 ttl=64 time=2400.463 ms
+64 bytes from 127.0.0.1: icmp_seq=3 ttl=64 time=2400.464 ms
+64 bytes from 127.0.0.1: icmp_seq=4 ttl=64 time=2400.427 ms
+64 bytes from 127.0.0.1: icmp_seq=5 ttl=64 time=2400.307 ms
+64 bytes from 127.0.0.1: icmp_seq=6 ttl=64 time=2400.240 ms
+64 bytes from 127.0.0.1: icmp_seq=7 ttl=64 time=2400.222 ms
+64 bytes from 127.0.0.1: icmp_seq=8 ttl=64 time=2400.314 ms
+--- localhost ping statistics ---
+10 packets transmitted, 9 packets received, 10% packet loss
+round-trip min/avg/max/stddev = 2400.222/2400.339/2400.464/0.086 ms
+ping localhost -c10 -W 1  0.00s user 0.01s system 0% cpu 11.011 total
+################################
+# RESULT MY PING =
+
+➜  ft_ping git:(main) ✗ time ./ft_ping localhost -c10 -W 1
+PING localhost (127.0.0.1): 56 bytes of data.
+64 bytes from 127.0.0.1: icmp_seq=0 ttl=233 rtt=2400.434 ms
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=234 rtt=2400.310 ms
+64 bytes from 127.0.0.1: icmp_seq=2 ttl=235 rtt=2400.328 ms
+64 bytes from 127.0.0.1: icmp_seq=3 ttl=236 rtt=2400.299 ms
+64 bytes from 127.0.0.1: icmp_seq=4 ttl=237 rtt=2400.383 ms
+64 bytes from 127.0.0.1: icmp_seq=5 ttl=238 rtt=2400.335 ms
+64 bytes from 127.0.0.1: icmp_seq=6 ttl=239 rtt=2400.399 ms
+64 bytes from 127.0.0.1: icmp_seq=7 ttl=240 rtt=2400.459 ms
+64 bytes from 127.0.0.1: icmp_seq=8 ttl=241 rtt=2400.272 ms
+--- localhost ping statistics ---
+10 packets transmitted, 9 received, 10% packet loss
+round-trip min/avg/max/stddev = 2400.272/2400.358/2400.459/0.060 ms
+./ft_ping localhost -c10 -W 1  0.31s user 0.69s system 9% cpu 11.010 total
+################################
+################################################################
 ##########################################################################
 # ENVIRONMENT = sudo tc qdisc replace dev lo root netem delay 200ms 50ms #
 ##########################################################################
@@ -105,13 +178,42 @@ round-trip min/avg/max/stddev = 10000.254/10000.323/10000.410/0.056 ms
 ################################
 # RESULT REAL PING =
 
-
+➜  ft_ping git:(main) ✗ time ping localhost -c10 -W 1
+PING localhost (127.0.0.1): 56 data bytes
+64 bytes from 127.0.0.1: icmp_seq=0 ttl=64 time=383.564 ms
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 time=395.011 ms
+64 bytes from 127.0.0.1: icmp_seq=2 ttl=64 time=373.704 ms
+64 bytes from 127.0.0.1: icmp_seq=3 ttl=64 time=407.839 ms
+64 bytes from 127.0.0.1: icmp_seq=4 ttl=64 time=470.401 ms
+64 bytes from 127.0.0.1: icmp_seq=5 ttl=64 time=353.718 ms
+64 bytes from 127.0.0.1: icmp_seq=6 ttl=64 time=360.283 ms
+64 bytes from 127.0.0.1: icmp_seq=7 ttl=64 time=376.598 ms
+64 bytes from 127.0.0.1: icmp_seq=8 ttl=64 time=374.166 ms
+64 bytes from 127.0.0.1: icmp_seq=9 ttl=64 time=450.508 ms
+--- localhost ping statistics ---
+10 packets transmitted, 10 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 353.718/394.579/470.401/36.326 ms
+ping localhost -c10 -W 1  0.00s user 0.00s system 0% cpu 9.460 total
 ################################
 # RESULT MY PING =
 
-
+➜  ft_ping git:(main) ✗ time ./ft_ping localhost -c10 -W 1                      
+PING localhost (127.0.0.1): 56 bytes of data.
+64 bytes from 127.0.0.1: icmp_seq=0 ttl=59 rtt=424.736 ms
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=60 rtt=412.621 ms
+64 bytes from 127.0.0.1: icmp_seq=2 ttl=61 rtt=455.990 ms
+64 bytes from 127.0.0.1: icmp_seq=3 ttl=62 rtt=355.280 ms
+64 bytes from 127.0.0.1: icmp_seq=4 ttl=63 rtt=445.008 ms
+64 bytes from 127.0.0.1: icmp_seq=5 ttl=64 rtt=372.515 ms
+64 bytes from 127.0.0.1: icmp_seq=6 ttl=65 rtt=468.559 ms
+64 bytes from 127.0.0.1: icmp_seq=7 ttl=66 rtt=421.759 ms
+64 bytes from 127.0.0.1: icmp_seq=8 ttl=67 rtt=411.921 ms
+64 bytes from 127.0.0.1: icmp_seq=9 ttl=68 rtt=426.600 ms
+--- localhost ping statistics ---
+10 packets transmitted, 10 received, 0% packet loss
+round-trip min/avg/max/stddev = 355.280/419.499/468.559/33.028 ms
+./ft_ping localhost -c10 -W 1  0.01s user 0.00s system 0% cpu 9.437 total
 ################################
-
 ################################################################
 #####################################################################
 # ENVIRONMENT = sudo tc qdisc replace dev lo root netem corrupt 50% #

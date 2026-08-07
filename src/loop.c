@@ -15,9 +15,53 @@ void sigint_handler(int sig)
     g_running = 0;
 }
 
+void print_destination(t_ping *ping){
+    printf("PING %s (%s): %u bytes of data", ping->dest, inet_ntoa(ping->addr.sin_addr), PAYLOAD_SIZE);
+    if (ping->mode & OPT_VERBOSE)
+    {
+        printf(", id 0x%x = %i\n", ping->pid, ping->pid);
+    }
+    else
+    {
+        printf(".\n");
+    }
+}
+
+void print_privilege(int mode)
+{
+    if (mode & OPT_VERBOSE)
+    {
+        printf("%sRoot privileges required for raw socket, using SOCK_DGRAM instead%s\n", YELLOW, RESET);
+    }
+}
+
+int create_socket(int mode, bool *socket_dgram){
+    int fd = 0;
+    fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+    if (fd < 0)
+    {
+        if (errno == EPERM || errno == EACCES)
+        {
+            print_privilege(mode);
+            fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_ICMP);
+            if (fd < 0)
+            {
+                perror("socket_dgram creation failed : ");
+                exit(EXIT_FAILURE);
+            }
+            *socket_dgram = true;
+        }
+        else
+        {
+            perror("socket_raw creation failed : ");
+            exit(EXIT_FAILURE);
+        }
+    }
+    return fd;
+}
+
 void resolve_destination(t_ping *ping)
 {
-
     struct addrinfo hints, *res;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET; // IPv4
@@ -34,39 +78,8 @@ void resolve_destination(t_ping *ping)
     memmove(&ping->addr, res->ai_addr, sizeof(struct sockaddr_in));
     freeaddrinfo(res);
 
-    printf("PING %s (%s): %u bytes of data", ping->dest, inet_ntoa(ping->addr.sin_addr), PAYLOAD_SIZE);
-    if (ping->mode & OPT_VERBOSE)
-    {
-        printf(", id 0x%x = %i\n", ping->pid, ping->pid);
-    }
-    else
-    {
-
-        printf(".\n");
-    }
-    ping->socket_fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
-    if (ping->socket_fd < 0)
-    {
-        if (errno == EPERM || errno == EACCES)
-        {
-            if (ping->mode & OPT_VERBOSE)
-            {
-                printf("%sRoot privileges required for raw socket, using SOCK_DGRAM instead%s\n", YELLOW, RESET);
-            }
-            ping->socket_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_ICMP);
-            if (ping->socket_fd < 0)
-            {
-                perror("socket_dgram creation failed : ");
-                exit(EXIT_FAILURE);
-            }
-            ping->socket_dgram = true;
-        }
-        else
-        {
-            perror("socket_raw creation failed : ");
-            exit(EXIT_FAILURE);
-        }
-    }
+    ping->socket_fd = create_socket(ping->mode, &ping->socket_dgram);
+    print_destination(ping);
 }
 
 /* calcul si le current time - start time est > timeout_sec */
@@ -132,6 +145,9 @@ bool loop(t_ping *ping)
 
         if (is_timeout(&start_time, TIMEOUT_SEC))
         {
+            // struct timeval current_time;
+            // gettimeofday(&current_time, NULL);
+            // printf("elapsed time = %d ms\n", (int)((current_time.tv_sec - start_time.tv_sec) * 1000 + (current_time.tv_usec - start_time.tv_usec) / 1000));
             if (ping->count == 0 || ping->count > ping->packets_sent)
             {
                 if (!send_packet(ping, &start_time))

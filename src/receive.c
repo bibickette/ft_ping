@@ -5,6 +5,7 @@
 #include <netinet/ip_icmp.h>
 #include <netinet/ip.h>
 
+
 // si on recalcule le checksun et quon tombe sur 0 c'est que le checksum est valide
 static bool verify_checksum(struct icmphdr *receive_data, int icmp_len)
 {
@@ -75,6 +76,8 @@ bool receive_packet(t_ping *ping, struct timeval *end_time)
     }
 
     struct iphdr *ip_hdr = (struct iphdr *)buffer;
+    // struct ip *ip2 = (struct ip *)buffer;
+    // printf("ttl ip header = %d\n", ip2->ip_ttl);
     // ip_hdr->ihl * 4 -> gives the size of the IP header in bytes, so we can use it to find the start of the ICMP header in the received packet.
     struct icmphdr *icmp = (struct icmphdr *)(buffer + ip_hdr->ihl * 4);
     // Length of the ICMP packet icmp header + payload
@@ -152,10 +155,12 @@ bool receive_packet(t_ping *ping, struct timeval *end_time)
     gettimeofday(end_time, NULL);
     double time_packet = (end_time->tv_sec - sent_time->tv_sec) * 1000.0 + (end_time->tv_usec - sent_time->tv_usec) / 1000.0;
 
+    // printf("%d bytes; ", result);
     printf("%d bytes from %s: ", result - ip_hdr->ihl * 4, inet_ntoa(recv_addr.sin_addr));
     printf("icmp_seq=%u ", ntohs(icmp->un.echo.sequence));
     printf("ttl=%u ", ip_hdr->ttl);
     printf("rtt=%.3f ms", time_packet);
+
     if (is_duplicate(ping, ntohs(icmp->un.echo.sequence)))
     {
         printf(" (DUP!)");
