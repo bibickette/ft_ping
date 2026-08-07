@@ -24,12 +24,17 @@ static bool is_echo_from_myself(struct icmphdr *receive_data)
 
 static bool is_my_pid(struct icmphdr *receive_data)
 {
-    return ((receive_data->type == ICMP_ECHOREPLY && receive_data->un.echo.id == htons(getpid() & 0xffff)));
+    return (receive_data->un.echo.id == htons(getpid() & 0xffff));
 }
 
 static bool is_socket_dgram(t_ping *ping)
 {
     return ping->socket_dgram;
+}
+
+bool is_duplicate(t_ping *ping, uint16_t sequence_number)
+{
+    return ping->sequence_received[sequence_number % MAX_RECV_SEQ_SAVE];
 }
 
 void fill_rtt(t_rtt *rtt, double time_packet)
@@ -52,12 +57,8 @@ enum packet_error
     ERR_NOT_MY_PID = 2,
     ERR_ADDR_MISMATCH = 3,
     ERR_CHECKSUM_INVALID = 4,
+    ERR_NOT_ECHOREPLY = 5
 };
-
-bool is_duplicate(t_ping *ping, uint16_t sequence_number)
-{
-    return ping->sequence_received[sequence_number % MAX_RECV_SEQ_SAVE];
-}
 
 bool receive_packet(t_ping *ping, struct timeval *end_time)
 {
@@ -90,6 +91,10 @@ bool receive_packet(t_ping *ping, struct timeval *end_time)
     {
         error = ERR_NOT_MY_PID;
     }
+    else if (icmp->type != ICMP_ECHOREPLY)
+    {
+        error = ERR_NOT_ECHOREPLY;
+    }
     else if (!is_addr_match(&ping->addr, &recv_addr))
     {
         error = ERR_ADDR_MISMATCH;
@@ -114,6 +119,9 @@ bool receive_packet(t_ping *ping, struct timeval *end_time)
                 return true;
             case ERR_NOT_MY_PID:
                 printf("%secho reply from unexpected pid : %d - src pid : %d%s\n", YELLOW, ntohs((uint16_t)icmp->un.echo.id), getpid() & 0xffff, RESET);
+                return true;
+            case ERR_NOT_ECHOREPLY:
+                printf("%snot an echo reply, icmp type : %d%s\n", YELLOW, icmp->type, RESET);
                 return true;
             case ERR_ADDR_MISMATCH:
                 // keep in a buffer the expected and received sequence numbers and IP addresses for debugging purposes
