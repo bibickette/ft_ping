@@ -50,6 +50,7 @@ bool send_packet(t_ping *ping, struct timeval *start_time)
         perror("sendto failed");
         return false;
     }
+    // printf("%d send bytes to %s, seq=%d, pid=%d\n", result, inet_ntoa(ping->addr.sin_addr), ping->sequence_number, ntohs(packet.icmp_hdr.un.echo.id));
     ping->sequence_received[ping->sequence_number % MAX_RECV_SEQ_SAVE] = false;
     ping->sequence_number++;
     ping->packets_sent++;

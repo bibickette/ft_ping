@@ -34,7 +34,7 @@ void resolve_destination(t_ping *ping)
     memmove(&ping->addr, res->ai_addr, sizeof(struct sockaddr_in));
     freeaddrinfo(res);
 
-    printf("PING %s (%s): %lu bytes of data", ping->dest, inet_ntoa(ping->addr.sin_addr), ping->size_payload);
+    printf("PING %s (%s): %u bytes of data", ping->dest, inet_ntoa(ping->addr.sin_addr), PAYLOAD_SIZE);
     if (ping->mode & OPT_VERBOSE)
     {
         int pid = getpid() & 0xFFFF;
@@ -48,8 +48,24 @@ void resolve_destination(t_ping *ping)
     ping->socket_fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
     if (ping->socket_fd < 0)
     {
-        perror("socket creation failed : ");
-        exit(EXIT_FAILURE);
+        if (errno == EPERM || errno == EACCES)
+        {
+            if(ping->mode & OPT_VERBOSE)
+            {
+                printf("%sRoot privileges required for raw socket, using SOCK_DGRAM instead%s\n", YELLOW, RESET);
+            }
+            ping->socket_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_ICMP);
+            if (ping->socket_fd < 0)
+            {
+                perror("socket_dgram creation failed : ");
+                exit(EXIT_FAILURE);
+            }
+            ping->socket_dgram = true;
+        }
+        else{
+            perror("socket_raw creation failed : ");
+            exit(EXIT_FAILURE);
+        }
     }
 }
 

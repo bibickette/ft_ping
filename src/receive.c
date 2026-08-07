@@ -27,6 +27,11 @@ static bool is_my_pid(struct icmphdr *receive_data)
     return ((receive_data->type == ICMP_ECHOREPLY && receive_data->un.echo.id == htons(getpid() & 0xffff)));
 }
 
+static bool is_socket_dgram(t_ping *ping)
+{
+    return ping->socket_dgram;
+}
+
 void fill_rtt(t_rtt *rtt, double time_packet)
 {
     if (rtt->min == 0 || time_packet < rtt->min)
@@ -81,7 +86,7 @@ bool receive_packet(t_ping *ping, struct timeval *end_time)
     {
         error = ERR_ECHO_FROM_MYSELF;
     }
-    else if (!is_my_pid(icmp))
+    else if (!is_my_pid(icmp) && !is_socket_dgram(ping))
     {
         error = ERR_NOT_MY_PID;
     }
@@ -105,10 +110,10 @@ bool receive_packet(t_ping *ping, struct timeval *end_time)
             switch (error)
             {
             case ERR_ECHO_FROM_MYSELF:
-                printf("%secho request from myself, sequence : %u%s\n", YELLOW, ntohs(icmp->un.echo.sequence), RESET);
+                printf("%secho request from myself, icmp_seq : %u%s\n", YELLOW, ntohs(icmp->un.echo.sequence), RESET);
                 return true;
             case ERR_NOT_MY_PID:
-                printf("%secho reply from unexpected pid : %u - source : %u%s\n", YELLOW, ntohs(icmp->un.echo.id), htons(getpid() & 0xffff), RESET);
+                printf("%secho reply from unexpected pid : %d - src pid : %d%s\n", YELLOW, ntohs((uint16_t)icmp->un.echo.id), getpid() & 0xffff, RESET);
                 return true;
             case ERR_ADDR_MISMATCH:
                 // keep in a buffer the expected and received sequence numbers and IP addresses for debugging purposes
@@ -120,7 +125,7 @@ bool receive_packet(t_ping *ping, struct timeval *end_time)
 
                 inet_ntop(AF_INET, &recv_addr.sin_addr,
                           received_ip, sizeof(received_ip));
-                printf("%secho reply from unexpected ip : %s - source : %s%s\n", YELLOW, received_ip, expected_ip, RESET);
+                printf("%secho reply from unexpected ip : %s - src ip : %s%s\n", YELLOW, received_ip, expected_ip, RESET);
                 return true;
             }
         }
@@ -155,9 +160,5 @@ bool receive_packet(t_ping *ping, struct timeval *end_time)
     }
     fill_rtt(&ping->rtt, time_packet);
     printf("\n");
-    // }
-    // else{
-    //         printf("Received ICMP type %d code %d\n", icmp->type, icmp->code);
-    // }
     return true;
 }

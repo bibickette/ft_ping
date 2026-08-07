@@ -50,6 +50,7 @@ typedef struct s_ping
     int socket_fd;
     /* flags */
     int mode;
+    bool socket_dgram;
     ssize_t count;
     int time_select;
 
