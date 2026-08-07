@@ -49,7 +49,7 @@ void resolve_destination(t_ping *ping)
     {
         if (errno == EPERM || errno == EACCES)
         {
-            if(ping->mode & OPT_VERBOSE)
+            if (ping->mode & OPT_VERBOSE)
             {
                 printf("%sRoot privileges required for raw socket, using SOCK_DGRAM instead%s\n", YELLOW, RESET);
             }
@@ -61,25 +61,21 @@ void resolve_destination(t_ping *ping)
             }
             ping->socket_dgram = true;
         }
-        else{
+        else
+        {
             perror("socket_raw creation failed : ");
             exit(EXIT_FAILURE);
         }
     }
 }
 
-/* calcul si le current time - start time est > timeout_sec */ 
+/* calcul si le current time - start time est > timeout_sec */
 bool is_timeout(struct timeval *start_time, double timeout_sec)
 {
     struct timeval current_time;
     gettimeofday(&current_time, NULL);
     double elapsed_time = (current_time.tv_sec - start_time->tv_sec) * 1000 + (current_time.tv_usec - start_time->tv_usec) / 1000;
-    if (elapsed_time >= timeout_sec * 1000)
-    {
-        printf("elapsed time = %.3f ms\n", elapsed_time);
-        return true;
-    }
-    return false;
+    return (elapsed_time >= timeout_sec * 1000);
 }
 
 // fd set
@@ -98,20 +94,41 @@ bool loop(t_ping *ping)
 
     fd_set read_fds;
 
-    struct timeval timeout, start_time, end_time;
+    struct timeval resp_time, start_time, end_time, intvl, now;
     int res = 0;
+
+    intvl.tv_sec = TIMEOUT_SEC;
+    intvl.tv_usec = 0;
 
     if (!send_packet(ping, &start_time))
     {
         return false;
     }
+
     while (g_running)
     {
         FD_ZERO(&read_fds);
         FD_SET(ping->socket_fd, &read_fds);
 
-        timeout.tv_sec = TIMEOUT_SEC;
-        timeout.tv_usec = 0;
+        gettimeofday(&now, NULL);
+        resp_time.tv_sec = start_time.tv_sec + intvl.tv_sec - now.tv_sec;
+        resp_time.tv_usec = start_time.tv_usec + intvl.tv_usec - now.tv_usec;
+
+        while (resp_time.tv_usec < 0)
+        {
+            resp_time.tv_usec += 1000000;
+            resp_time.tv_sec--;
+        }
+        while (resp_time.tv_usec >= 1000000)
+        {
+            resp_time.tv_usec -= 1000000;
+            resp_time.tv_sec++;
+        }
+
+        if (resp_time.tv_sec < 0)
+        {
+            resp_time.tv_sec = resp_time.tv_usec = 0;
+        }
 
         if (is_timeout(&start_time, TIMEOUT_SEC))
         {
@@ -123,7 +140,7 @@ bool loop(t_ping *ping)
                 }
             }
         }
-        res = select(ping->socket_fd + 1, &read_fds, NULL, NULL, &timeout);
+        res = select(ping->socket_fd + 1, &read_fds, NULL, NULL, &resp_time);
         if (res < 0)
         {
             if (errno == EINTR)
@@ -143,16 +160,12 @@ bool loop(t_ping *ping)
             if (is_timeout(&start_time, ping->time_select))
             {
                 // -W N correspond au linger : le nombre de secondes pendant lesquelles ping continue d'attendre des réponses après l'envoi des paquets.
-                if(ping->mode & OPT_VERBOSE)
+                if (ping->mode & OPT_VERBOSE)
                 {
                     printf("%sLinger timeout (%d seconds)%s\n", YELLOW, ping->time_select - TIMEOUT_SEC, RESET);
                 }
                 break;
             }
-            // struct timeval current_time;
-            // gettimeofday(&current_time, NULL);
-            // printf("elapsed time select = %d ms\n", (int)((current_time.tv_sec - start_time.tv_sec) * 1000 + (current_time.tv_usec - start_time.tv_usec) / 1000));
-           
             continue;
         }
         else

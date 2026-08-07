@@ -34,6 +34,8 @@ envoie des packets de PAYLOAD SIZE
 
 description du packet recu
 
+comment il attend avec select
+
 # simuler un environment de reseau pour ping :
 explications des commandes netem
 exemples de commandes netem
