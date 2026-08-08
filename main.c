@@ -45,13 +45,14 @@ int main(int argc, char *argv[])
     t_ping ping;
     memset(&ping, 0, sizeof(t_ping));
 
-    ping.time_select = LATE_REPLY; 
+    ping.linger = LINGER_TIME; 
     
     parse_opts(argc, argv, &ping);
     
     ping.pid = getpid() & 0xFFFF;
-    ping.time_select += TIMEOUT_SEC; // add the timeout for select to the linger time
+    ping.linger += TIMEOUT_SEC; // add the timeout for select to the linger time
 
+    resolve_destination(&ping);
     int ret = 0;
     ret = loop(&ping);
 
@@ -69,9 +70,11 @@ int main(int argc, char *argv[])
 }
 
 /*
--w -> timeout du programme
+refacto -> dans loop le timer, dans receive le handle error
 -i -> interval between each ping
 
+
+-w ok
 -W ok
 -c ok
 

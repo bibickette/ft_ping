@@ -56,6 +56,45 @@ enum packet_error
     ERR_NOT_ECHOREPLY = 5
 };
 
+void handle_error( int error, int mode, uint16_t pid, struct icmphdr *icmp, struct sockaddr_in from_addr,struct sockaddr_in recv_addr){
+    if (!(mode & OPT_VERBOSE) && error != ERR_CHECKSUM_INVALID)
+    {
+        // if no verbose mode, no need to print anything, just return
+        return ;
+    }
+    else if (mode & OPT_VERBOSE && error != ERR_CHECKSUM_INVALID)
+    {
+        switch (error)
+        {
+        case ERR_ECHO_FROM_MYSELF:
+            printf("%secho request from myself, icmp_seq : %u%s\n", YELLOW, ntohs(icmp->un.echo.sequence), RESET);
+            return ;
+        case ERR_NOT_MY_PID:
+            printf("%secho reply from unexpected pid : %d - src pid : %d%s\n", YELLOW, ntohs((uint16_t)icmp->un.echo.id), pid, RESET);
+            return ;
+        case ERR_NOT_ECHOREPLY:
+            printf("%snot an echo reply, icmp type : %d%s\n", YELLOW, icmp->type, RESET);
+            return ;
+        case ERR_ADDR_MISMATCH:
+        {
+            // keep in a buffer the expected and received sequence numbers and IP addresses for debugging purposes
+            char expected_ip[INET_ADDRSTRLEN];
+            char received_ip[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, &from_addr.sin_addr,
+                      expected_ip, sizeof(expected_ip));
+            inet_ntop(AF_INET, &recv_addr.sin_addr,
+                      received_ip, sizeof(received_ip));
+            printf("%secho reply from unexpected ip : %s - src ip : %s%s\n", YELLOW, received_ip, expected_ip, RESET);
+            return ;}
+        }
+    }
+    else if (error == ERR_CHECKSUM_INVALID)
+    {
+        printf("checksum mismatch from %s\n", inet_ntoa(recv_addr.sin_addr));
+        return ;
+    }
+}
+
 bool receive_packet(t_ping *ping, struct timeval *end_time)
 {
     char buffer[RECV_BUFFER_SIZE] = {0};
@@ -104,42 +143,8 @@ bool receive_packet(t_ping *ping, struct timeval *end_time)
 
     if (error)
     {
-        if (!(ping->mode & OPT_VERBOSE) && error != ERR_CHECKSUM_INVALID)
-        {
-            return true;
-        }
-        else if (ping->mode & OPT_VERBOSE && error != ERR_CHECKSUM_INVALID)
-        {
-            switch (error)
-            {
-            case ERR_ECHO_FROM_MYSELF:
-                printf("%secho request from myself, icmp_seq : %u%s\n", YELLOW, ntohs(icmp->un.echo.sequence), RESET);
-                return true;
-            case ERR_NOT_MY_PID:
-                printf("%secho reply from unexpected pid : %d - src pid : %d%s\n", YELLOW, ntohs((uint16_t)icmp->un.echo.id), ping->pid, RESET);
-                return true;
-            case ERR_NOT_ECHOREPLY:
-                printf("%snot an echo reply, icmp type : %d%s\n", YELLOW, icmp->type, RESET);
-                return true;
-            case ERR_ADDR_MISMATCH:
-                // keep in a buffer the expected and received sequence numbers and IP addresses for debugging purposes
-                char expected_ip[INET_ADDRSTRLEN];
-                char received_ip[INET_ADDRSTRLEN];
-
-                inet_ntop(AF_INET, &ping->addr.sin_addr,
-                          expected_ip, sizeof(expected_ip));
-
-                inet_ntop(AF_INET, &recv_addr.sin_addr,
-                          received_ip, sizeof(received_ip));
-                printf("%secho reply from unexpected ip : %s - src ip : %s%s\n", YELLOW, received_ip, expected_ip, RESET);
-                return true;
-            }
-        }
-        else if (error == ERR_CHECKSUM_INVALID)
-        {
-            printf("checksum mismatch from %s\n", inet_ntoa(recv_addr.sin_addr));
-            return true;
-        }
+        handle_error(error, ping->mode, ping->pid, icmp, ping->addr, recv_addr);
+        return true;
     }
 
     char payload[56] = {0};

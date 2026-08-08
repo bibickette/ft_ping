@@ -78,20 +78,53 @@ bool is_timeout(struct timeval *start_time, double timeout_sec)
 // if res > 0 => receive_packet
 // receive packet : si pas mon paquet => continue
 // si mon paquet => afficher le rtt et les infos
+
+/*
+    calculate remaining time to wait in the select
+    each time we send a packet, we need to wait for a response for TIMEOUT_SEC seconds
+    so we calculate the remaining time to wait for the select call
+    exact behavior of the inetutils ping (see source code)
+*/
+void calculate_time_to_wait(struct timeval *start_time, struct timeval *resp_time)
+{
+    struct timeval intvl, now;
+
+        gettimeofday(&now, NULL);
+
+    intvl.tv_sec = TIMEOUT_SEC;
+    intvl.tv_usec = 0;
+    resp_time->tv_sec = start_time->tv_sec + intvl.tv_sec - now.tv_sec;
+    resp_time->tv_usec = start_time->tv_usec + intvl.tv_usec - now.tv_usec;
+
+    while (resp_time->tv_usec < 0)
+    {
+        resp_time->tv_usec += 1000000;
+        resp_time->tv_sec--;
+    }
+    while (resp_time->tv_usec >= 1000000)
+    {
+        resp_time->tv_usec -= 1000000;
+        resp_time->tv_sec++;
+    }
+
+    if (resp_time->tv_sec < 0)
+    {
+        resp_time->tv_sec = resp_time->tv_usec = 0;
+    }
+}
+
 bool loop(t_ping *ping)
 {
-    resolve_destination(ping);
     signal(SIGINT, sigint_handler);
 
     fd_set read_fds;
 
-    struct timeval resp_time, start_time, end_time, intvl, now;
+    struct timeval resp_time, last_send, last_receive, program_start_time;
     int res = 0;
 
-    intvl.tv_sec = TIMEOUT_SEC;
-    intvl.tv_usec = 0;
 
-    if (!send_packet(ping, &start_time))
+    gettimeofday(&program_start_time, NULL);
+    if (!send_packet(ping, &last_send))
     {
         return false;
     }
@@ -101,39 +134,16 @@ bool loop(t_ping *ping)
         FD_ZERO(&read_fds);
         FD_SET(ping->socket_fd, &read_fds);
 
-        gettimeofday(&now, NULL);
-        resp_time.tv_sec = start_time.tv_sec + intvl.tv_sec - now.tv_sec;
-        resp_time.tv_usec = start_time.tv_usec + intvl.tv_usec - now.tv_usec;
+        calculate_time_to_wait(&last_send, &resp_time);
 
-        while (resp_time.tv_usec < 0)
+        if (is_timeout(&last_send, TIMEOUT_SEC) && (ping->count == 0 || ping->count > ping->packets_sent))
         {
-            resp_time.tv_usec += 1000000;
-            resp_time.tv_sec--;
-        }
-        while (resp_time.tv_usec >= 1000000)
-        {
-            resp_time.tv_usec -= 1000000;
-            resp_time.tv_sec++;
-        }
-
-        if (resp_time.tv_sec < 0)
-        {
-            resp_time.tv_sec = resp_time.tv_usec = 0;
-        }
-
-        if (is_timeout(&start_time, TIMEOUT_SEC))
-        {
-            // struct timeval current_time;
-            // gettimeofday(&current_time, NULL);
-            // printf("elapsed time = %d ms\n", (int)((current_time.tv_sec - start_time.tv_sec) * 1000 + (current_time.tv_usec - start_time.tv_usec) / 1000));
-            if (ping->count == 0 || ping->count > ping->packets_sent)
+            if (!send_packet(ping, &last_send))
             {
-                if (!send_packet(ping, &start_time))
-                {
-                    return false;
-                }
+                return false;
             }
         }
+
         res = select(ping->socket_fd + 1, &read_fds, NULL, NULL, &resp_time);
         if (res < 0)
         {
@@ -150,13 +160,12 @@ bool loop(t_ping *ping)
             // si select recoit rien depuis X temps ET si on a pas de count alors on continue
             // -W peut changer ce temps
             // -W ne controle pas si laller retour est > a timeout, cest juste pour le select
-            // inetutils-2.0/ping/ping_common.h:#define MAXWAIT         10     /* Max seconds to wait for response.  */
-            if (is_timeout(&start_time, ping->time_select))
+            if (is_timeout(&last_send, ping->linger) || (ping->timeout > 0 && is_timeout(&program_start_time, ping->timeout)))
             {
                 // -W N correspond au linger : le nombre de secondes pendant lesquelles ping continue d'attendre des réponses après l'envoi des paquets.
                 if (ping->mode & OPT_VERBOSE)
                 {
-                    printf("%sLinger timeout (%d seconds)%s\n", YELLOW, ping->time_select - TIMEOUT_SEC, RESET);
+                    printf("%sLinger timeout (%d seconds)%s\n", YELLOW, ping->linger - TIMEOUT_SEC, RESET);
                 }
                 break;
             }
@@ -164,7 +173,7 @@ bool loop(t_ping *ping)
         }
         else
         {
-            if (!receive_packet(ping, &end_time))
+            if (!receive_packet(ping, &last_receive))
             {
                 return false;
             }

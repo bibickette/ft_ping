@@ -18,11 +18,12 @@ void parse_opts(int argc, char *argv[], t_ping *ping) {
         {"verbose",  no_argument,       0, 'v'},
         {"count",    required_argument, 0, 'c'},
         {"linger",   required_argument, 0, 'W'},
+        {"timeout",  required_argument, 0, 'w'},
         {0,          0,                 0,  0 }
     };
 
     int opt = 0;
-    while ((opt = getopt_long(argc, argv, "?hc:vW:", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "?hc:vW:w:", long_options, NULL)) != -1) {
         switch (opt) {
             case 'h':
             case '?':
@@ -35,7 +36,10 @@ void parse_opts(int argc, char *argv[], t_ping *ping) {
                 ping->mode |= OPT_VERBOSE;
                 break;
             case 'W':
-                ping->time_select = atoi(optarg);
+                ping->linger = atoi(optarg);
+                break;
+            case'w':
+                ping->timeout = atoi(optarg);
                 break;
             // case 's':
             //     ping->size_payload = atoi(optarg);

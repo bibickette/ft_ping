@@ -18,8 +18,9 @@
 
 /* time to and select */
 #define TIMEOUT_SEC 1
-/* time to wait for a reply */
-#define LATE_REPLY 10
+/* linger time default */
+// inetutils-2.0/ping/ping_common.h:#define MAXWAIT         10
+#define LINGER_TIME 10
 /* maximum number of received sequence numbers to save, permet to control duplicates */
 #define MAX_RECV_SEQ_SAVE 1024
 
@@ -52,8 +53,9 @@ typedef struct s_ping
     
     /* flags */
     int mode;
-    ssize_t count;
-    int time_select;
+    ssize_t count; // -c
+    int linger; // -W
+    int timeout; // -w
 
     unsigned long size_payload;
     /* garder le sequence number dans un uint16 car cest le type du paquet de sequence, donc quand on envoie  > uint16 seq il reboucle*/
