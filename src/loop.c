@@ -15,7 +15,8 @@ void sigint_handler(int sig)
     g_running = 0;
 }
 
-void print_destination(t_ping *ping){
+void print_destination(t_ping *ping)
+{
     printf("PING %s (%s): %u bytes of data", ping->dest, inet_ntoa(ping->addr.sin_addr), PAYLOAD_SIZE);
     if (ping->mode & OPT_VERBOSE)
     {
@@ -27,13 +28,14 @@ void print_destination(t_ping *ping){
     }
 }
 
-int create_socket(void){
+int create_socket(void)
+{
     int fd = 0;
     fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
     if (fd < 0)
     {
-            perror("socket_raw creation failed : ");
-            exit(EXIT_FAILURE);
+        perror("socket_raw creation failed : ");
+        exit(EXIT_FAILURE);
     }
     return fd;
 }
@@ -57,6 +59,17 @@ void resolve_destination(t_ping *ping)
     freeaddrinfo(res);
 
     ping->socket_fd = create_socket();
+
+    if (ping->mode & OPT_TTL)
+    {
+        if (setsockopt(ping->socket_fd, IPPROTO_IP, IP_TTL, &ping->ttl, sizeof(int)) < 0)
+        {
+            close(ping->socket_fd);
+            perror("setsockopt failed");
+            exit(EXIT_FAILURE);
+        }
+    }
+
     print_destination(ping);
 }
 
@@ -89,7 +102,7 @@ void calculate_time_to_wait(struct timeval *start_time, struct timeval *resp_tim
 {
     struct timeval intvl, now;
 
-        gettimeofday(&now, NULL);
+    gettimeofday(&now, NULL);
 
     intvl.tv_sec = TIMEOUT_SEC;
     intvl.tv_usec = 0;
@@ -121,7 +134,6 @@ bool loop(t_ping *ping)
 
     struct timeval resp_time, last_send, last_receive, program_start_time;
     int res = 0;
-
 
     gettimeofday(&program_start_time, NULL);
     if (!send_packet(ping, &last_send))
@@ -165,7 +177,7 @@ bool loop(t_ping *ping)
                 // -W N correspond au linger : le nombre de secondes pendant lesquelles ping continue d'attendre des réponses après l'envoi des paquets.
                 if (ping->mode & OPT_VERBOSE)
                 {
-                    printf("%sLinger timeout (%d seconds)%s\n", YELLOW, ping->linger - TIMEOUT_SEC, RESET);
+                    printf("%sLinger timeout (%d seconds)%s\n", YELLOW, ping->linger, RESET);
                 }
                 break;
             }

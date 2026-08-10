@@ -32,6 +32,7 @@
 enum arg_opt
 {
     OPT_VERBOSE  = 1 << 0,
+    OPT_TTL    = 1 << 1,
 };
 
 typedef struct s_rtt
@@ -56,6 +57,7 @@ typedef struct s_ping
     ssize_t count; // -c
     int linger; // -W
     int timeout; // -w
+    int ttl; // --ttl
 
     unsigned long size_payload;
     /* garder le sequence number dans un uint16 car cest le type du paquet de sequence, donc quand on envoie  > uint16 seq il reboucle*/

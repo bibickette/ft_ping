@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
     parse_opts(argc, argv, &ping);
     
     ping.pid = getpid() & 0xFFFF;
-    ping.linger += TIMEOUT_SEC; // add the timeout for select to the linger time
+    ping.linger += TIMEOUT_SEC; // add the timeout for select to the linger time, simulate 
 
     resolve_destination(&ping);
     int ret = 0;
@@ -70,9 +70,13 @@ int main(int argc, char *argv[])
 }
 
 /*
-refacto -> dans loop le timer, dans receive le handle error
+todo:
 -i -> interval between each ping
-
+--ttl= => flag and arg
+verify int arg between int max and 0
+➜  ft_ping git:(main) ✗ ping localhost --ttl=10 -i 0.1
+ping: option value too small: 0.1
+➜  ft_ping git:(main) ✗ ping localhost --ttl=10 -i 0.2
 
 -w ok
 -W ok
