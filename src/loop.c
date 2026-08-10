@@ -121,7 +121,10 @@ bool loop(t_ping *ping)
                 {
                     if (ping->mode & OPT_VERBOSE)
                     {
-                        printf("%sLinger timeout (%d milliseconds)%s\n", YELLOW, ping->linger_ms, RESET);
+                        struct timeval now;
+                        gettimeofday(&now, NULL);
+                        double elapsed = (now.tv_sec - last_send.tv_sec) * 1000 + (now.tv_usec - last_send.tv_usec) / 1000.0;
+                        printf("%sLinger timeout elapsed: %.2f ms%s\n", YELLOW, elapsed, RESET);
                     }
                     break;
                 }
@@ -130,8 +133,7 @@ bool loop(t_ping *ping)
             if (ping->packets_sent >= ping->count && ping->count > 0)
             {
                 finish = 1;
-                printf(" finishing sending waiting for response\n");
-                interval_ms = ping->linger_ms;  // if we have sent all packets, we wait for linger time before exiting
+                interval_ms += ping->linger_ms;  // if we have sent all packets, we wait for linger time before exiting
                 gettimeofday(&last_send, NULL); // reset last_send to now to start the linger timer
             }
             continue;
@@ -151,6 +153,7 @@ bool loop(t_ping *ping)
             {
                 break;
             }
+            
         }
     }
     return true;

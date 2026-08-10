@@ -71,12 +71,7 @@ int main(int argc, char *argv[])
 
 /*
 todo:
--i -> interval between each ping
---ttl= => flag and arg
-verify int arg between int max and 0
-➜  ft_ping git:(main) ✗ ping localhost --ttl=10 -i 0.1
-ping: option value too small: 0.1
-➜  ft_ping git:(main) ✗ ping localhost --ttl=10 -i 0.2
+
 
 -w ok
 -W ok
