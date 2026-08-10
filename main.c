@@ -51,7 +51,6 @@ int main(int argc, char *argv[])
     parse_opts(argc, argv, &ping);
     
     ping.pid = getpid() & 0xFFFF;
-    ping.linger_ms += ping.interval_ms; // add the timeout for select to the linger time, simulate 
 
     resolve_dest(&ping);
     int ret = 0;
