@@ -21,6 +21,7 @@
 /* linger time default */
 // inetutils-2.0/ping/ping_common.h:#define MAXWAIT         10
 #define LINGER_TIME 10
+#define MILLISEC_PRECISION 1000
 /* maximum number of received sequence numbers to save, permet to control duplicates */
 #define MAX_RECV_SEQ_SAVE 1024
 
@@ -55,9 +56,10 @@ typedef struct s_ping
     /* flags */
     int mode;
     ssize_t count; // -c
-    int linger; // -W
-    int timeout; // -w
+    int linger_ms; // -W
+    int timeout_s; // -w
     int ttl; // --ttl
+    ssize_t interval_ms; // -i
 
     unsigned long size_payload;
     /* garder le sequence number dans un uint16 car cest le type du paquet de sequence, donc quand on envoie  > uint16 seq il reboucle*/
@@ -79,7 +81,7 @@ typedef struct s_ping
 void parse_opts(int argc, char *argv[], t_ping *ping);
 
 /*  do_ping.c */
-void resolve_destination(t_ping *ping);
+void resolve_dest(t_ping *ping);
 bool loop(t_ping *ping);
 
 /*  send.c */

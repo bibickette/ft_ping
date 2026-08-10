@@ -1,6 +1,9 @@
 ➜  ft_ping git:(main) ✗ sudo tc qdisc replace dev lo root netem duplicate 50% delay 10000ms
 
 
+sudo tc qdisc replace dev lo root netem delay 200ms 50ms
+time sudo ./ft_ping -i 0.3 localhost -W 1 -c 12  -w 1
+
 ➜  ft_ping git:(main) ✗ ping -W 1 -c 10 localhost
 PING localhost (127.0.0.1): 56 data bytes
 --- localhost ping statistics ---

@@ -53,7 +53,7 @@ ping: option value too small: 0
             break;
 
         case 'W':
-            ping->linger = atoi(optarg);
+            ping->linger_ms = atoi(optarg) * MILLISEC_PRECISION; // convert to milliseconds
             // max = int max and min 1
             /*
             ➜  ft_ping git:(main) ✗ ping localhost -W  2147483648
@@ -65,18 +65,23 @@ ping: option value too small: 0
             break;
         case 'w':
             // same than -W
-            ping->timeout = atoi(optarg);
+            ping->timeout_s = atoi(optarg);
             break;
         case 'i':
         {
             char *end; // to verify if interval is a valid number
             double interval = strtod(optarg, &end);
-            if (interval < 0.2 || *end != '\0')
+            if (*end != '\0')
             {
-                fprintf(stderr, "%sping: option value too small: %s%s\n", RED, optarg, RESET);
-                printf("end: %s\n", end);
+                fprintf(stderr, "%sping: option value not a valid number: %s%s\n", RED, optarg, RESET);
                 exit(EXIT_FAILURE);
             }
+            else if (interval < 0.2)
+            {
+                fprintf(stderr, "%sping: option value too small: %s%s\n", RED, optarg, RESET);
+                exit(EXIT_FAILURE);
+            }
+            ping->interval_ms = interval * MILLISEC_PRECISION; // convert to milliseconds
         }
         // interval between each ping, min 0.2s
         break;

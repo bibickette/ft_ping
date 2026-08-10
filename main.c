@@ -45,14 +45,15 @@ int main(int argc, char *argv[])
     t_ping ping;
     memset(&ping, 0, sizeof(t_ping));
 
-    ping.linger = LINGER_TIME; 
+    ping.linger_ms = LINGER_TIME * MILLISEC_PRECISION; // default linger time in milliseconds
+    ping.interval_ms = TIMEOUT_SEC * MILLISEC_PRECISION; // default interval in milliseconds
     
     parse_opts(argc, argv, &ping);
     
     ping.pid = getpid() & 0xFFFF;
-    ping.linger += TIMEOUT_SEC; // add the timeout for select to the linger time, simulate 
+    ping.linger_ms += ping.interval_ms; // add the timeout for select to the linger time, simulate 
 
-    resolve_destination(&ping);
+    resolve_dest(&ping);
     int ret = 0;
     ret = loop(&ping);
 
