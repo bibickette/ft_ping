@@ -91,4 +91,91 @@ Donc le temps restant est bien :
 `500 ms`
 
 
+# IPv4 = Internet Protocol version 4.
+
+C'est le protocole qui permet notamment d'identifier et d'acheminer des paquets entre des machines grâce aux adresses IPv4.
+
+Par exemple :
+
+127.0.0.1
+192.168.1.10
+8.8.8.8
+
+Une adresse IPv4 fait 32 bits, généralement écrits sous forme de 4 nombres décimaux :
+
+192 . 168 . 1 . 10
+ \____4 octets____/
+
+4 × 8 bits = 32 bits
+
+IPv4 définit également un header qui accompagne chaque paquet.
+
+# 8.8.8.8 and 0.0.0.0
+
+Ce sont deux adresses qui ont des significations très différentes.
+ping 8.8.8.8
+
+8.8.8.8 est une adresse IPv4 publique utilisée par le DNS public de Google.
+
+ping 0.0.0.0
+
+Là, c'est complètement différent.
+
+0.0.0.0 est une adresse spéciale, appelée adresse IPv4 non spécifiée (unspecified address).
+
+Elle ne signifie pas :
+
+« une machine dont l'adresse est 0.0.0.0 ».
+
+Elle signifie plutôt :
+
+« aucune adresse / toutes les adresses locales selon le contexte ».
+
+Par exemple, tu peux voir 0.0.0.0 dans :
+
+0.0.0.0
+
+pour dire « toutes les interfaces » lorsqu'un serveur écoute :
+
+0.0.0.0:8080
+
+Cela signifie :
+
+écoute sur toutes les adresses IPv4 locales.
+
+Et pourquoi ton ft_ping 0.0.0.0 t'avait donné 127.0.0.1 ?
+
+C'est justement le cas intéressant que tu avais rencontré.
+
+Tu avais quelque chose comme :
+
+PING 0.0.0.0 (0.0.0.0)
+echo reply from unexpected ip : 127.0.0.1
+
+Le système traite 0.0.0.0 d'une manière particulière pour la destination locale. Il peut finalement faire arriver le trafic sur la loopback 127.0.0.1.
+
+Donc tu peux avoir :
+
+Destination demandée :
+        0.0.0.0
+             │
+             ▼
+       traitement local
+             │
+             ▼
+        127.0.0.1
+
+Et c'est pour ça que ton test :
+
+if (received_ip != destination_ip)
+
+peut considérer la réponse comme « inattendue », alors que le comportement du système est cohérent.
+
+À retenir
+Adresse	Signification
+8.8.8.8	Adresse IPv4 publique réelle
+127.0.0.1	Loopback : ta propre machine
+0.0.0.0	Adresse non spécifiée / adresse spéciale, pas une machine à contacter normalement
+
+
 # la

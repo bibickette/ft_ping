@@ -1,26 +1,247 @@
 # readme organization
 
 # description :
-- ping cest quoi ca fait quoi  ca sert a quoi
+ft_ping est une réimplémentation du programme ping, dont l'objectif principal est de vérifier qu'une machine est joignable sur un réseau et de mesurer le temps nécessaire pour obtenir une réponse.
+
+## ping cest quoi ca fait quoi  ca sert a quoi
 ping inspired of inetutils 2.0
+ping est un outil permettant principalement de :
+vérifier qu'une destination est joignable ;
+vérifier qu'elle répond aux requêtes ICMP ;
+mesurer le RTT (Round Trip Time) ;
+observer la perte de paquets ;
+obtenir des informations comme le TTL dans la réponse.
+
+Par exemple :
+
+ping 8.8.8.8
+
+Le principe est :
+
+        ICMP Echo Request
+   ┌─────────────────────────►
+   │
+   │                         8.8.8.8
+   │                            │
+PC │                            │
+   │                         répond
+   │                            │
+   ◄─────────────────────────┘
+        ICMP Echo Reply
+
+Le temps entre l'envoi de l'Echo Request et la réception de l'Echo Reply correspond au RTT.
+
+## les differentes couches de protocole (modele osi)  
+Le modèle OSI permet de représenter les différentes fonctions nécessaires pour faire communiquer deux machines.
+
+┌──────────────────────────────┐
+│ 7. Application               │  HTTP, DNS, SSH...
+├──────────────────────────────┤
+│ 6. Présentation              │
+├──────────────────────────────┤
+│ 5. Session                   │
+├──────────────────────────────┤
+│ 4. Transport                 │  TCP, UDP
+├──────────────────────────────┤
+│ 3. Réseau                    │  IP, ICMP
+├──────────────────────────────┤
+│ 2. Liaison de données        │  Ethernet, ARP...
+├──────────────────────────────┤
+│ 1. Physique                  │  câble, fibre, radio...
+└──────────────────────────────┘
+
+Pour ping, les couches les plus importantes sont :
+
+Application
+     │
+     │
+     ▼
+Réseau
+  IP / ICMP
+     │
+     ▼
+Liaison
+ Ethernet
+     │
+     ▼
+Physique
+Petite nuance importante
+
+Dans le modèle OSI théorique, ICMP est généralement associé à la couche 3 (Réseau).
+
+ping lui-même est plutôt considéré comme un outil applicatif qui utilise ICMP.
+
+Donc évite d'écrire :
+
+"ping est un protocole de couche 3."
+
+Ce serait incorrect.
+
+Il vaut mieux écrire :
+
+ping est un programme qui utilise principalement le protocole ICMP, lui-même situé à la couche Réseau.
 
 
-- les differentes couches de protocole (modele osi)  
+## ou se trouve ping dans ces couches  
+Le ICMP (Internet Control Message Protocol) est un protocole qui opère à la Couche 3 (Couche Réseau) du modèle OSI (Open Systems Interconnection)
+C'est une distinction importante :
 
-- ou se trouve ping dans ces couches  
+                  PROGRAMME
+                     ping
+                      │
+                      │ utilise
+                      ▼
+                    ICMP
+                      │
+                      │ encapsulé dans
+                      ▼
+                     IPv4
+                      │
+                      ▼
+                   Ethernet
+                      │
+                      ▼
+                   Physique
 
-- les differents protocole de cette couche  
+Donc :
 
-- le protocol de ping  
+ping
+  ↓
+ICMP
+  ↓
+IPv4
+  ↓
+Ethernet
+  ↓
+Physique
+
+ping n'est donc pas lui-même un protocole réseau.
 
 
-- retrouver le code de ping :
+## les differents protocole de cette couche  
+Pour ton README, je ne ferais pas une liste gigantesque. Concentre-toi sur ceux qui permettent de comprendre ping.
+
+IPv4
+
+Internet Protocol version 4
+
+Il permet notamment l'adressage et le routage des paquets.
+
+Un paquet IPv4 contient notamment :
+
+┌──────────────────────┐
+│ IPv4 Header          │
+├──────────────────────┤
+│ Payload              │
+└──────────────────────┘
+
+Dans ton cas, le payload est un paquet ICMP :
+
+┌──────────────────────┐
+│ IPv4 Header          │
+├──────────────────────┤
+│ ICMP Header          │
+├──────────────────────┤
+│ ICMP Payload         │
+└──────────────────────┘
+ICMP
+
+Internet Control Message Protocol
+
+Il est utilisé pour envoyer des messages de contrôle et d'erreur au niveau IP.
+
+C'est le protocole utilisé par ping.
+
+ARP
+
+Address Resolution Protocol
+
+Il permet notamment de trouver l'adresse MAC correspondant à une adresse IPv4 sur un réseau local.
+
+Tu n'as pas besoin de l'implémenter dans ft_ping, mais c'est intéressant de le mentionner parce que le paquet IPv4 doit finalement être transporté sur une couche de liaison.
+
+## le protocol de ping ICMP   
+C'est probablement la partie la plus importante de ton README.
+Le ICMP (Internet Control Message Protocol) est un protocole qui opère à la Couche 3 (Couche Réseau) du modèle OSI (Open Systems Interconnection)
+    fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+AF_INET
+   │
+   └──► IPv4
+ping utilise principalement deux messages ICMP :
+
+Echo Request
+      │
+      ▼
+   machine
+      │
+      ▼
+Echo Reply
+
+Pour IPv4 :
+
+ICMP Echo Request
+Type = 8
+Code = 0
+
+et :
+
+ICMP Echo Reply
+Type = 0
+Code = 0
+Structure ICMP Echo
+
+Tu peux mettre ce schéma :
+
+ 0                   1                   2                   3
+ 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|     Type      |     Code      |          Checksum             |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|         Identifier            |       Sequence Number         |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                         Data / Payload                        |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Les champs importants sont :
+
+Type
+
+Indique le type de message.
+
+8 → Echo Request
+0 → Echo Reply
+Code
+
+Pour les Echo Request/Reply :
+
+Code = 0
+Checksum
+
+Permet de détecter une corruption du message ICMP.
+
+Identifier
+
+Permet notamment d'identifier les requêtes appartenant à une instance de ping.
+
+Sequence Number
+
+Permet d'identifier les différents paquets :
+
+seq = 0
+seq = 1
+seq = 2
+seq = 3
+...
+
+C'est notamment ce qui te permet de savoir quelle réponse correspond à quelle requête.
+
+## retrouver le code de ping :
   ```
   apt source inetutils
   ```
   apres il faut faire `./configure` et `make`
 
-- conversion :
+## conversion :
 Host To Network Short
 sert quand TOI tu prends une valeur de ta machine et que tu veux la mettre dans un paquet réseau.
 
@@ -46,6 +267,129 @@ Alors que le réseau utilise le network byte order, qui est big-endian :
        | 12 | 34 |
        +----+----+
 
+
+## TTL
+
+Je rajouterais absolument une section sur le TTL puisque tu as travaillé dessus.
+
+TTL = Time To Live
+
+Le TTL est un champ du header IPv4 :
+
+IPv4 Header
+┌─────────────────────────────┐
+│ ...                         │
+│ TTL = 64                    │
+│ Protocol = ICMP             │
+│ ...                         │
+└─────────────────────────────┘
+
+Le TTL est décrémenté lorsqu'un paquet traverse un routeur.
+
+Exemple :
+
+PC                    Routeur                 Destination
+ │                       │                         │
+ │ TTL = 64              │                         │
+ ├──────────────────────►│                         │
+ │                       │ TTL = 63                │
+ │                       ├────────────────────────►│
+ │                       │                         │
+
+Cela permet notamment d'éviter qu'un paquet bloqué dans une boucle de routage circule indéfiniment.
+
+Dans ton programme, avec un paquet reçu :
+
+struct iphdr *ip_hdr = (struct iphdr *)buffer;
+
+printf("TTL = %u\n", ip_hdr->ttl);
+
+ttl est un champ de 8 bits, donc tu n'as pas besoin de ntohs().
+
+## Sockets RAW
+
+Puisque c'est un point important de ton projet, je mettrais une section dédiée.
+
+Ton programme utilise une socket RAW, par exemple :
+
+socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+
+Une socket RAW permet de travailler beaucoup plus directement avec les paquets réseau qu'une socket TCP/UDP classique.
+
+Schématiquement :
+
+Application
+     │
+     │ socket RAW ICMP
+     ▼
+┌───────────────┐
+│ Linux Kernel  │
+└───────┬───────┘
+        │
+        ▼
+IPv4 + ICMP
+
+Dans ton cas, à la réception, tu peux accéder au header IPv4 :
+
+buffer
+  ↓
+IPv4 header
+  ↓
+ICMP header
+  ↓
+payload
+
+C'est notamment ce qui te permet de récupérer :
+
+le TTL ;
+l'IP source ;
+l'IP destination ;
+le protocole ;
+le header ICMP ;
+l'identifier ;
+la séquence ;
+le payload.
+
+## RTT et statistiques
+
+Je rajouterais également cette section parce que c'est une fonctionnalité fondamentale de ping.
+
+Le RTT (Round Trip Time) correspond à :
+
+       émission
+          │
+          ▼
+        réseau
+          │
+          ▼
+      destination
+          │
+          ▼
+        réseau
+          │
+          ▼
+       réception
+
+RTT = réception - émission
+
+Par exemple :
+
+send_time = 10.000 s
+recv_time = 10.015 s
+
+RTT = 15 ms
+
+Après plusieurs paquets, tu peux calculer :
+
+min
+avg
+max
+stddev
+
+Ce qui donne quelque chose comme :
+
+round-trip min/avg/max/stddev =
+0.120/0.150/0.220/0.030 ms
 
 
 
@@ -108,7 +452,48 @@ ping need to be launched with root permission (sudo) because it needs to be able
 ctrl C handled
 
 ## icmp packet description
+Voici le fonctionnement complet que je mettrais dans le README :
 
+                     ft_ping
+                        │
+                        │ 1. construit ICMP Echo Request
+                        ▼
+              ┌───────────────────┐
+              │ ICMP Echo Request │
+              │ type = 8          │
+              │ seq = 0            │
+              └─────────┬─────────┘
+                        │
+                        ▼
+              ┌───────────────────┐
+              │    IPv4 Header    │
+              ├───────────────────┤
+              │ ICMP Echo Request │
+              └─────────┬─────────┘
+                        │
+                        │ réseau
+                        ▼
+                  Destination
+                        │
+                        │ répond
+                        ▼
+              ┌───────────────────┐
+              │    IPv4 Header    │
+              ├───────────────────┤
+              │  ICMP Echo Reply  │
+              └─────────┬─────────┘
+                        │
+                        ▼
+                     ft_ping
+                        │
+                        ├── vérifie l'adresse
+                        ├── vérifie l'ID
+                        ├── vérifie la séquence
+                        ├── vérifie le checksum
+                        ├── récupère le TTL
+                        └── calcule le RTT
+
+C'est vraiment le cœur de ton projet.
 ### packet send
 
 schema dun packet :
