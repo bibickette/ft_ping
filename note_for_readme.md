@@ -1,41 +1,39 @@
 # readme organization
 
 # description :
-ft_ping est une réimplémentation du programme ping, dont l'objectif principal est de vérifier qu'une machine est joignable sur un réseau et de mesurer le temps nécessaire pour obtenir une réponse.
 
-## ping cest quoi ca fait quoi  ca sert a quoi
-ping inspired of inetutils 2.0
-ping est un outil permettant principalement de :
-vérifier qu'une destination est joignable ;
-vérifier qu'elle répond aux requêtes ICMP ;
-mesurer le RTT (Round Trip Time) ;
-observer la perte de paquets ;
-obtenir des informations comme le TTL dans la réponse.
+`ft_ping` est un projet en C qui consiste à réimplémenter le programme `ping` de inetutils-2.0. `ping` a pour objectif principal de vérifier qu'une machine est joignable sur un réseau et mesurer le temps nécessaire pour obtenir une réponse.
 
-Par exemple :
+`ping` est un outil permettant principalement de :
+- vérifier qu'une destination est joignable 
+- vérifier qu'elle répond aux requêtes ICMP 
+- mesurer le RTT (Round Trip Time : temps entre l'envoi de l'Echo Request et la réception de l'Echo Reply)
+- observer la perte de paquets 
+- obtenir des informations comme le TTL dans la réponse
 
-ping 8.8.8.8
-
-Le principe est :
+Exemple :
+``` sh
+ping 8.8.8.8 # IP adress of Google DNS
 
         ICMP Echo Request
    ┌─────────────────────────►
-   │
-   │                         8.8.8.8
-   │                            │
-PC │                            │
-   │                         répond
-   │                            │
+   │                         │
+   │                      8.8.8.8
+   │                         │
+PC │                         │
+   │                      répond
+   │                         │
    ◄─────────────────────────┘
         ICMP Echo Reply
+```
 
-Le temps entre l'envoi de l'Echo Request et la réception de l'Echo Reply correspond au RTT.
+## norme de communication de tous les systèmes informatiques en réseau (modele osi)  
 
-## les differentes couches de protocole (modele osi)  
-Le modèle OSI permet de représenter les différentes fonctions nécessaires pour faire communiquer deux machines.
+Le modèle OSI (Open Systems Interconnection) permet de représenter les différentes fonctions nécessaires pour faire communiquer deux machines.
 
+```
 ┌──────────────────────────────┐
-│ 7. Application               │  HTTP, DNS, SSH...
+│ 7. Application               │  HTTP, DNS, SSH, ping
 ├──────────────────────────────┤
 │ 6. Présentation              │
 ├──────────────────────────────┤
@@ -43,82 +41,18 @@ Le modèle OSI permet de représenter les différentes fonctions nécessaires po
 ├──────────────────────────────┤
 │ 4. Transport                 │  TCP, UDP
 ├──────────────────────────────┤
-│ 3. Réseau                    │  IP, ICMP
+│ 3. Réseau                    │  IP, ICMP, IPv4
 ├──────────────────────────────┤
 │ 2. Liaison de données        │  Ethernet, ARP...
 ├──────────────────────────────┤
 │ 1. Physique                  │  câble, fibre, radio...
 └──────────────────────────────┘
+```
 
-Pour ping, les couches les plus importantes sont :
-
-Application
-     │
-     │
-     ▼
-Réseau
-  IP / ICMP
-     │
-     ▼
-Liaison
- Ethernet
-     │
-     ▼
-Physique
-Petite nuance importante
-
-Dans le modèle OSI théorique, ICMP est généralement associé à la couche 3 (Réseau).
-
-ping lui-même est plutôt considéré comme un outil applicatif qui utilise ICMP.
-
-Donc évite d'écrire :
-
-"ping est un protocole de couche 3."
-
-Ce serait incorrect.
-
-Il vaut mieux écrire :
-
-ping est un programme qui utilise principalement le protocole ICMP, lui-même situé à la couche Réseau.
+`ping` est un programme qui utilise principalement le protocole ICMP, lui-même situé à la couche Réseau.
 
 
-## ou se trouve ping dans ces couches  
-Le ICMP (Internet Control Message Protocol) est un protocole qui opère à la Couche 3 (Couche Réseau) du modèle OSI (Open Systems Interconnection)
-C'est une distinction importante :
-
-                  PROGRAMME
-                     ping
-                      │
-                      │ utilise
-                      ▼
-                    ICMP
-                      │
-                      │ encapsulé dans
-                      ▼
-                     IPv4
-                      │
-                      ▼
-                   Ethernet
-                      │
-                      ▼
-                   Physique
-
-Donc :
-
-ping
-  ↓
-ICMP
-  ↓
-IPv4
-  ↓
-Ethernet
-  ↓
-Physique
-
-ping n'est donc pas lui-même un protocole réseau.
-
-
-## les differents protocole de cette couche  
+## Les différents protocoles utilisés pour ping
 Pour ton README, je ne ferais pas une liste gigantesque. Concentre-toi sur ceux qui permettent de comprendre ping.
 
 IPv4
@@ -128,14 +62,17 @@ Internet Protocol version 4
 Il permet notamment l'adressage et le routage des paquets.
 
 Un paquet IPv4 contient notamment :
+```
 
 ┌──────────────────────┐
 │ IPv4 Header          │
 ├──────────────────────┤
 │ Payload              │
 └──────────────────────┘
+```
 
 Dans ton cas, le payload est un paquet ICMP :
+```
 
 ┌──────────────────────┐
 │ IPv4 Header          │
@@ -144,6 +81,8 @@ Dans ton cas, le payload est un paquet ICMP :
 ├──────────────────────┤
 │ ICMP Payload         │
 └──────────────────────┘
+```
+
 ICMP
 
 Internet Control Message Protocol
@@ -160,15 +99,69 @@ Il permet notamment de trouver l'adresse MAC correspondant à une adresse IPv4 s
 
 Tu n'as pas besoin de l'implémenter dans ft_ping, mais c'est intéressant de le mentionner parce que le paquet IPv4 doit finalement être transporté sur une couche de liaison.
 
-## le protocol de ping ICMP   
-C'est probablement la partie la plus importante de ton README.
+# ping fonctionnement
+
+## Sockets RAW
+
+Une socket RAW est un type de socket permettant d'interagir directement avec la couche réseau. Elle peut être utilisée pour fabriquer des paquets personnalisés (comme ICMP).
+
+ping utilise une socket RAW :
+``` c
+socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+```
+
+Schématiquement :
+```
+Application
+     │
+     │ socket RAW ICMP
+     ▼
+┌───────────────┐
+│ Linux Kernel  │
+└───────┬───────┘
+        │
+        ▼
+IPv4 + ICMP
+```
+
+Dans ton cas, à la réception, tu peux accéder au header IPv4 :
+
+```
+buffer
+  ↓
+IPv4 header
+  ↓
+ICMP header
+  ↓
+payload
+```
+
+C'est notamment ce qui te permet de récupérer :
+
+le TTL ;
+l'IP source ;
+l'IP destination ;
+le protocole ;
+le header ICMP ;
+l'identifier ;
+la séquence ;
+le payload.
+
+
+## icmp packet description
+
 Le ICMP (Internet Control Message Protocol) est un protocole qui opère à la Couche 3 (Couche Réseau) du modèle OSI (Open Systems Interconnection)
     fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+
+```
 AF_INET
    │
    └──► IPv4
+```
+
 ping utilise principalement deux messages ICMP :
 
+```
 Echo Request
       │
       ▼
@@ -176,6 +169,7 @@ Echo Request
       │
       ▼
 Echo Reply
+```
 
 Pour IPv4 :
 
@@ -190,270 +184,35 @@ Type = 0
 Code = 0
 Structure ICMP Echo
 
-Tu peux mettre ce schéma :
+```
+byte  0               1               2               3
+bits  0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     | Type          |   Code (0)    |           Checksum            |   <----
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+       |---- header icmp
+     |           Identifier          |        Sequence Number        |   <----
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                          Data / Payload                       |   <---- payload
+```
 
- 0                   1                   2                   3
- 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|     Type      |     Code      |          Checksum             |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|         Identifier            |       Sequence Number         |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                         Data / Payload                        |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-
-Les champs importants sont :
-
-Type
-
-Indique le type de message.
+Type : Indique le type de message.
 
 8 → Echo Request
 0 → Echo Reply
-Code
 
-Pour les Echo Request/Reply :
-
+Code : Pour les Echo Request/Reply :
 Code = 0
-Checksum
 
-Permet de détecter une corruption du message ICMP.
+Checksum : Permet de détecter une corruption du message ICMP.
 
-Identifier
+Identifier : Permet notamment d'identifier les requêtes appartenant à une instance de ping.
 
-Permet notamment d'identifier les requêtes appartenant à une instance de ping.
-
-Sequence Number
-
-Permet d'identifier les différents paquets :
-
-seq = 0
-seq = 1
-seq = 2
-seq = 3
-...
-
+Sequence Number : Permet d'identifier les différents paquets 
 C'est notamment ce qui te permet de savoir quelle réponse correspond à quelle requête.
 
-## retrouver le code de ping :
-  ```
-  apt source inetutils
-  ```
-  apres il faut faire `./configure` et `make`
 
-## conversion :
-Host To Network Short
-sert quand TOI tu prends une valeur de ta machine et que tu veux la mettre dans un paquet réseau.
-
-nous on a un lil endian donc on doit le convertir en big pour envoyer
-on recoit un big et on doit convertir en petit pour imprimer
-little endian = poids faible a droite
-big endian = poids fort a droite
-reseau = big endian
-host = lil endian
-Network To Host Short
-sert quand tu lis une valeur provenant du paquet réseau et que tu veux l'utiliser comme entier sur ta machine.
-
-Sur une machine little-endian, en mémoire tu as :
-
-adresse →
-       +----+----+
-       | 34 | 12 |
-       +----+----+
-
-Alors que le réseau utilise le network byte order, qui est big-endian :
-
-       +----+----+
-       | 12 | 34 |
-       +----+----+
-
-
-## TTL
-
-Je rajouterais absolument une section sur le TTL puisque tu as travaillé dessus.
-
-TTL = Time To Live
-
-Le TTL est un champ du header IPv4 :
-
-IPv4 Header
-┌─────────────────────────────┐
-│ ...                         │
-│ TTL = 64                    │
-│ Protocol = ICMP             │
-│ ...                         │
-└─────────────────────────────┘
-
-Le TTL est décrémenté lorsqu'un paquet traverse un routeur.
-
-Exemple :
-
-PC                    Routeur                 Destination
- │                       │                         │
- │ TTL = 64              │                         │
- ├──────────────────────►│                         │
- │                       │ TTL = 63                │
- │                       ├────────────────────────►│
- │                       │                         │
-
-Cela permet notamment d'éviter qu'un paquet bloqué dans une boucle de routage circule indéfiniment.
-
-Dans ton programme, avec un paquet reçu :
-
-struct iphdr *ip_hdr = (struct iphdr *)buffer;
-
-printf("TTL = %u\n", ip_hdr->ttl);
-
-ttl est un champ de 8 bits, donc tu n'as pas besoin de ntohs().
-
-## Sockets RAW
-
-Puisque c'est un point important de ton projet, je mettrais une section dédiée.
-
-Ton programme utilise une socket RAW, par exemple :
-
-socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
-
-Une socket RAW permet de travailler beaucoup plus directement avec les paquets réseau qu'une socket TCP/UDP classique.
-
-Schématiquement :
-
-Application
-     │
-     │ socket RAW ICMP
-     ▼
-┌───────────────┐
-│ Linux Kernel  │
-└───────┬───────┘
-        │
-        ▼
-IPv4 + ICMP
-
-Dans ton cas, à la réception, tu peux accéder au header IPv4 :
-
-buffer
-  ↓
-IPv4 header
-  ↓
-ICMP header
-  ↓
-payload
-
-C'est notamment ce qui te permet de récupérer :
-
-le TTL ;
-l'IP source ;
-l'IP destination ;
-le protocole ;
-le header ICMP ;
-l'identifier ;
-la séquence ;
-le payload.
-
-## RTT et statistiques
-
-Je rajouterais également cette section parce que c'est une fonctionnalité fondamentale de ping.
-
-Le RTT (Round Trip Time) correspond à :
-
-       émission
-          │
-          ▼
-        réseau
-          │
-          ▼
-      destination
-          │
-          ▼
-        réseau
-          │
-          ▼
-       réception
-
-RTT = réception - émission
-
-Par exemple :
-
-send_time = 10.000 s
-recv_time = 10.015 s
-
-RTT = 15 ms
-
-Après plusieurs paquets, tu peux calculer :
-
-min
-avg
-max
-stddev
-
-Ce qui donne quelque chose comme :
-
-round-trip min/avg/max/stddev =
-0.120/0.150/0.220/0.030 ms
-
-
-
-
-# environment :
-description de la VM :  
-host : debian bullseye, built with qemu
-
-ping de inetutils-2.0 (ping -V)
+Workflow : 
 ```
-➜  ft_ping git:(main) ✗ ping -V
-ping (GNU inetutils) 2.0
-Copyright (C) 2021 Free Software Foundation, Inc.
-License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.
-This is free software: you are free to change and redistribute it.
-There is NO WARRANTY, to the extent permitted by law.
-
-Written by Sergey Poznyakoff.
-```
-
-# tree : 
-```
-.
-├── main.c
-├── Makefile
-├── README.md
-├── include
-│   └── ft_ping.h
-└── src
-    ├── loop.c
-    ├── parse_opts.c
-    ├── receive.c
-    ├── resolve_dest.c
-    └── send.c
-
-```
-# ping fonctionnement :
-## operations permitted and descriptions
--? -h --help : display help
--v, --verbose : enable verbose output (view error from packet and pid)
--w, --timeout=N : stop after N seconds
--W, --linger=N : (redefinition of the description for better understanding in the ping implementation)  time in second where ping wait for icmp packet reply to respond after the sending all of the packets, original definition : "number of seconds to wait for response"
-dans le ping de inetutils 2.0 :
-```
-	  if (!ping->ping_count || ping->ping_num_xmit < ping->ping_count)
-	  else if (finishing)
-	  else
-	    {
-	      finishing = 1;
-	      intvl.tv_sec = linger;
-	    }
-```
-
--i, --interval=NUMBER :      wait NUMBER seconds between sending each packet 
--c, --count=NUMBER :        stop after sending NUMBER packets (and accessories wait for linger seconds)
--t, --ttl=N :               specify N as time-to-live (set with setsockopt)
-
-ping need to be launched with root permission (sudo) because it needs to be able to create socket raw (capacity CAP_NET_RAW reserved to root)
-
-ctrl C handled
-
-## icmp packet description
-Voici le fonctionnement complet que je mettrais dans le README :
-
                      ft_ping
                         │
                         │ 1. construit ICMP Echo Request
@@ -466,7 +225,7 @@ Voici le fonctionnement complet que je mettrais dans le README :
                         │
                         ▼
               ┌───────────────────┐
-              │    IPv4 Header    │
+              │    IPv4 Header    │    <--- kernel encapsule le icmp echo request dans un ipv4 header
               ├───────────────────┤
               │ ICMP Echo Request │
               └─────────┬─────────┘
@@ -492,8 +251,8 @@ Voici le fonctionnement complet que je mettrais dans le README :
                         ├── vérifie le checksum
                         ├── récupère le TTL
                         └── calcule le RTT
+```
 
-C'est vraiment le cœur de ton projet.
 ### packet send
 
 schema dun packet :
@@ -508,7 +267,7 @@ bits  0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7
      |                          Data / Payload                       |   <---- payload
 ```
 
-structure :
+structure :  
 header icmp :
 ``` h
 /* from #include <netinet/ip_icmp.h> */
@@ -625,6 +384,7 @@ struct iphdr
 ```
 
 retrouver le header icmp a partir du packet recu :
+
 1. size header ipv4
 ``` c
     struct iphdr *ip_hdr = (struct iphdr *)buffer;
@@ -644,6 +404,153 @@ buffer + size ipv4
     memmove(payload, buffer + ip_hdr->ihl * 4 + sizeof(struct icmphdr), sizeof(payload));
     struct timeval *sent_time = (struct timeval *)payload;
 ```
+
+
+### TTL
+
+Je rajouterais absolument une section sur le TTL puisque tu as travaillé dessus.
+
+TTL = Time To Live
+
+Le TTL est un champ du header IPv4 :
+
+IPv4 Header
+┌─────────────────────────────┐
+│ ...                         │
+│ TTL = 64                    │
+│ Protocol = ICMP             │
+│ ...                         │
+└─────────────────────────────┘
+
+Le TTL est décrémenté lorsqu'un paquet traverse un routeur.
+
+Exemple :
+
+PC                    Routeur                 Destination
+ │                       │                         │
+ │ TTL = 64              │                         │
+ ├──────────────────────►│                         │
+ │                       │ TTL = 63                │
+ │                       ├────────────────────────►│
+ │                       │                         │
+
+Cela permet notamment d'éviter qu'un paquet bloqué dans une boucle de routage circule indéfiniment.
+
+Dans ton programme, avec un paquet reçu :
+
+struct iphdr *ip_hdr = (struct iphdr *)buffer;
+
+printf("TTL = %u\n", ip_hdr->ttl);
+
+ttl est un champ de 8 bits, donc tu n'as pas besoin de ntohs().
+
+
+### RTT et statistiques
+
+mesure de temps entre lenvoie et la reception de deux paquets
+min : le minimum de temps 
+avg : le temps moyen 
+max : le maximum de temps
+stddev : description + calcul
+
+
+Exemple :
+```
+here insert rtt exemple
+```
+
+
+## conversion :
+Host To Network Short
+sert quand TOI tu prends une valeur de ta machine et que tu veux la mettre dans un paquet réseau.
+
+nous on a un lil endian donc on doit le convertir en big pour envoyer
+on recoit un big et on doit convertir en petit pour imprimer
+little endian = poids faible a droite
+big endian = poids fort a droite
+reseau = big endian
+host = lil endian
+Network To Host Short
+sert quand tu lis une valeur provenant du paquet réseau et que tu veux l'utiliser comme entier sur ta machine.
+
+Sur une machine little-endian, en mémoire tu as :
+
+adresse →
+       +----+----+
+       | 34 | 12 |
+       +----+----+
+
+Alors que le réseau utilise le network byte order, qui est big-endian :
+
+       +----+----+
+       | 12 | 34 |
+       +----+----+
+
+
+
+## retrouver le code de ping :
+```
+apt source inetutils
+```
+apres il faut faire `./configure` et `make`
+
+
+# environment :
+description de la VM :  
+host : debian bullseye, built with qemu
+
+ping de inetutils-2.0 (ping -V)
+```
+➜  ft_ping git:(main) ✗ ping -V
+ping (GNU inetutils) 2.0
+Copyright (C) 2021 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+
+Written by Sergey Poznyakoff.
+```
+
+# tree : 
+```
+.
+├── main.c
+├── Makefile
+├── README.md
+├── include
+│   └── ft_ping.h
+└── src
+    ├── loop.c
+    ├── parse_opts.c
+    ├── receive.c
+    ├── resolve_dest.c
+    └── send.c
+
+```
+# ping fonctionnement :
+## operations permitted and descriptions
+-? -h --help : display help
+-v, --verbose : enable verbose output (view error from packet and pid)
+-w, --timeout=N : stop after N seconds
+-W, --linger=N : (redefinition of the description for better understanding in the ping implementation)  time in second where ping wait for icmp packet reply to respond after the sending all of the packets, original definition : "number of seconds to wait for response"
+dans le ping de inetutils 2.0 :
+```
+	  if (!ping->ping_count || ping->ping_num_xmit < ping->ping_count)
+	  else if (finishing)
+	  else
+	    {
+	      finishing = 1;
+	      intvl.tv_sec = linger;
+	    }
+```
+
+-i, --interval=NUMBER :      wait NUMBER seconds between sending each packet 
+-c, --count=NUMBER :        stop after sending NUMBER packets (and accessories wait for linger seconds)
+-t, --ttl=N :               specify N as time-to-live (set with setsockopt)
+
+ping need to be launched with root permission (sudo) because it needs to be able to create socket raw (capacity CAP_NET_RAW reserved to root)
+
+ctrl C handled
 
 
 # simuler un environment de reseau pour ping :
