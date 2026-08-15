@@ -11,7 +11,6 @@
 - observer la perte de paquets 
 - obtenir des informations comme le TTL dans la réponse
 
-Exemple :
 ``` sh
 ping 8.8.8.8 # IP adress of Google DNS
 
@@ -51,45 +50,32 @@ Le modèle OSI (Open Systems Interconnection) permet de représenter les différ
 
 `ping` est un programme qui utilise principalement le protocole ICMP, lui-même situé à la couche Réseau.
 
+Ici on voit surtout deux protocoles :
 
-## Les différents protocoles utilisés pour ping
-Pour ton README, je ne ferais pas une liste gigantesque. Concentre-toi sur ceux qui permettent de comprendre ping.
+ICMP (Internet Control Message Protocol) : utilisé pour envoyer des messages de contrôle et d'erreur au niveau IP.
 
-IPv4
-
-Internet Protocol version 4
-
-Il permet notamment l'adressage et le routage des paquets.
-
+IPv4 (Internet Protocol version 4) : permet notamment l'adressage et le routage des paquets.  
 Un paquet IPv4 contient notamment :
 ```
 
 ┌──────────────────────┐
 │ IPv4 Header          │
 ├──────────────────────┤
-│ Payload              │
+│ Payload              │ <- paquet ICMP
 └──────────────────────┘
-```
-
-Dans ton cas, le payload est un paquet ICMP :
-```
 
 ┌──────────────────────┐
 │ IPv4 Header          │
 ├──────────────────────┤
-│ ICMP Header          │
-├──────────────────────┤
-│ ICMP Payload         │
+│ ICMP Header          │ <---
+├──────────────────────┤    |-- payload
+│ ICMP Payload         │ <---
 └──────────────────────┘
+
 ```
 
-ICMP
 
-Internet Control Message Protocol
-
-Il est utilisé pour envoyer des messages de contrôle et d'erreur au niveau IP.
-
-C'est le protocole utilisé par ping.
+à explorer : 
 
 ARP
 
@@ -106,9 +92,28 @@ Tu n'as pas besoin de l'implémenter dans ft_ping, mais c'est intéressant de le
 Une socket RAW est un type de socket permettant d'interagir directement avec la couche réseau. Elle peut être utilisée pour fabriquer des paquets personnalisés (comme ICMP).
 
 ping utilise une socket RAW :
-``` c
+``` sh
 socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+
+# AF_INET
+#    │
+#    └──► IPv4
+
+# IPPROTO_ICMP
+#    │
+#    └──► Protocole ICMP
+
 ```
+
+Lors de l'envoie du paquet, le kernel encapsule le paquet ICMP dans un paquet IPv4, ce qui permet à la reception de récupérer plusieurs informations :
+- le TTL ;
+- l'IP source ;
+- l'IP destination ;
+- le protocole ;
+- le header ICMP ;
+- l'identifier ;
+- la séquence ;
+- le payload.
 
 Schématiquement :
 ```
@@ -124,65 +129,26 @@ Application
 IPv4 + ICMP
 ```
 
-Dans ton cas, à la réception, tu peux accéder au header IPv4 :
-
-```
-buffer
-  ↓
-IPv4 header
-  ↓
-ICMP header
-  ↓
-payload
-```
-
-C'est notamment ce qui te permet de récupérer :
-
-le TTL ;
-l'IP source ;
-l'IP destination ;
-le protocole ;
-le header ICMP ;
-l'identifier ;
-la séquence ;
-le payload.
-
 
 ## icmp packet description
 
-Le ICMP (Internet Control Message Protocol) est un protocole qui opère à la Couche 3 (Couche Réseau) du modèle OSI (Open Systems Interconnection)
-    fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
 
-```
-AF_INET
-   │
-   └──► IPv4
-```
-
-ping utilise principalement deux messages ICMP :
-
-```
-Echo Request
-      │
-      ▼
-   machine
-      │
-      ▼
-Echo Reply
-```
+ping utilise principalement deux messages ICMP : Echo Request et Echo Reply
 
 Pour IPv4 :
 
-ICMP Echo Request
+ICMP Echo Request  
 Type = 8
 Code = 0
 
 et :
 
-ICMP Echo Reply
+ICMP Echo Reply  
 Type = 0
 Code = 0
-Structure ICMP Echo
+
+
+Schema du paquet ICMP
 
 ```
 byte  0               1               2               3
@@ -208,7 +174,7 @@ Checksum : Permet de détecter une corruption du message ICMP.
 Identifier : Permet notamment d'identifier les requêtes appartenant à une instance de ping.
 
 Sequence Number : Permet d'identifier les différents paquets 
-C'est notamment ce qui te permet de savoir quelle réponse correspond à quelle requête.
+C'est notamment ce qui permet de savoir quelle réponse correspond à quelle requête.
 
 
 Workflow : 
@@ -220,7 +186,9 @@ Workflow :
               ┌───────────────────┐
               │ ICMP Echo Request │
               │ type = 8          │
-              │ seq = 0            │
+              │ seq = 0           │
+              |───────────────────|
+              | payload           |
               └─────────┬─────────┘
                         │
                         ▼
@@ -254,18 +222,6 @@ Workflow :
 ```
 
 ### packet send
-
-schema dun packet :
-```
-byte  0               1               2               3
-bits  0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7
-     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     | Type (8=Req)  |   Code (0)    |           Checksum            |   <----
-     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+       |---- header icmp
-     |           Identifier          |        Sequence Number        |   <----
-     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     |                          Data / Payload                       |   <---- payload
-```
 
 structure :  
 header icmp :
@@ -327,39 +283,11 @@ packet.icmp_hdr.checksum = calculate_checksum((unsigned short *)&packet, sizeof(
 
 envoie des packets de taille 64 (header icmp size : 8 + payload 56)
 
-### description du packet recu
-schema du packet recu  :
-```
-┌──────────────────────────────────────────────────────────┐
-│                    IPv4 HEADER                           │
-│                      20 bytes                            │
-│                                                          │
-│  Version │ IHL │ ... │ TTL │ Protocol │ Checksum │ ...  │    <--- add by kernel
-│                                                          │
-│  Source IP      : 127.0.0.1                              │
-│  Destination IP : 127.0.0.1                              │
-└──────────────────────────────────────────────────────────┘
-                         ↓
-┌──────────────────────────────────────────────────────────┐
-│                    ICMP HEADER                           │
-│                       8 bytes                            │
-│                                                          │
-│  Type │ Code │       Checksum                            │
-│                                                          │
-│  Identifier │ Sequence Number                            │
-└──────────────────────────────────────────────────────────┘
-                         ↓
-┌──────────────────────────────────────────────────────────┐
-│                    ICMP PAYLOAD                          │
-│                       56 bytes                            │
-│                                                          │
-│  timestamp / données que tu as envoyées                  │
-│  ...                                                     │
-└──────────────────────────────────────────────────────────┘
-```
+### Paquet received
 
-structure du packet recu :
+structure ip du paquet recu :
 ``` h
+/* from #include blabla */
 struct iphdr
   {
 #if __BYTE_ORDER == __LITTLE_ENDIAN
@@ -383,32 +311,43 @@ struct iphdr
   };
 ```
 
-retrouver le header icmp a partir du packet recu :
-
-1. size header ipv4
+Pour interpreter le paquet recu, il faut dabord retrouver le header ip, le header icmp et retrouver le timestamp inclu dans le payload
+1. retrouver le header ip:
 ``` c
-    struct iphdr *ip_hdr = (struct iphdr *)buffer;
+struct iphdr *ip_hdr = (struct iphdr *)buffer;
 ```
-IHL signifie Internet Header Length, mais il est exprimé en blocs de 32 bits (4 octets).
-La taille du ip hdr est la suivante : nombre d'ihl * taille d'ihl
-ip_hdr->ihl * 4
-a savoir que pour un header ipv4 valide minimum ihl fera minimum 5
-2. header icmp
-```c
+
+2. retrouver le header icmp a partir du packet recu :
+``` c
 struct icmphdr *icmp = (struct icmphdr *)(buffer + ip_hdr->ihl * 4);
 ```
-buffer + size ipv4
-3. extraire le timestamp du payload
+IHL signifie Internet Header Length, mais il est exprimé en blocs de 32 bits (4 octets).  
+La taille du ip hdr est la suivante : nombre d'ihl * taille d'ihl  
+ip_hdr->ihl * 4  
+a savoir que pour un header ipv4 valide minimum ihl fera minimum 5  
+buffer + size ipv4  
+3. extraire le timestamp du payload :
 ``` c
- char payload[56] = {0};
-    memmove(payload, buffer + ip_hdr->ihl * 4 + sizeof(struct icmphdr), sizeof(payload));
-    struct timeval *sent_time = (struct timeval *)payload;
+char payload[56] = {0};
+memmove(payload, buffer + ip_hdr->ihl * 4 + sizeof(struct icmphdr), sizeof(payload));
+struct timeval *sent_time = (struct timeval *)payload;
+```
+
+ca sert a imprimer les informations de ping :
+``` 
+here insert an exemple : 64 bytes from blabla : seq ttl rtt
 ```
 
 
-### TTL
+### TTL a redefinir dedans 
 
-Je rajouterais absolument une section sur le TTL puisque tu as travaillé dessus.
+
+
+le ttl peut etre modifié avec le flag -t --ttl , il est redéfinie par setsockopt
+```
+here insert setsockopt
+```
+
 
 TTL = Time To Live
 
@@ -436,22 +375,14 @@ PC                    Routeur                 Destination
 
 Cela permet notamment d'éviter qu'un paquet bloqué dans une boucle de routage circule indéfiniment.
 
-Dans ton programme, avec un paquet reçu :
-
-struct iphdr *ip_hdr = (struct iphdr *)buffer;
-
-printf("TTL = %u\n", ip_hdr->ttl);
-
-ttl est un champ de 8 bits, donc tu n'as pas besoin de ntohs().
-
 
 ### RTT et statistiques
 
-mesure de temps entre lenvoie et la reception de deux paquets
-min : le minimum de temps 
-avg : le temps moyen 
-max : le maximum de temps
-stddev : description + calcul
+Le RTT sert à mesurer le temps entre l'envoie et la réception d'un paquet. A la fin du programme, ping affiche ses statistiques :
+- min : le minimum de temps 
+- avg : le temps moyen 
+- max : le maximum de temps
+- stddev : description + calcul
 
 
 Exemple :
@@ -460,33 +391,31 @@ here insert rtt exemple
 ```
 
 
-## conversion :
-Host To Network Short
-sert quand TOI tu prends une valeur de ta machine et que tu veux la mettre dans un paquet réseau.
+## Byte order and conversion 
 
-nous on a un lil endian donc on doit le convertir en big pour envoyer
-on recoit un big et on doit convertir en petit pour imprimer
-little endian = poids faible a droite
-big endian = poids fort a droite
-reseau = big endian
-host = lil endian
-Network To Host Short
-sert quand tu lis une valeur provenant du paquet réseau et que tu veux l'utiliser comme entier sur ta machine.
+Le réseau et la machine utilise un ordre de byte différent, il faut donc les convertir.
 
-Sur une machine little-endian, en mémoire tu as :
+- Host To Network Short :
+Une machine fonctionne en little-endian (byte de poids faible à droite), alors il faut convertir en big-endian pour le mettre sur le réseau :
+``` sh
+insert here htons function
 
-adresse →
+# memory view
        +----+----+
        | 34 | 12 |
        +----+----+
+```
 
-Alors que le réseau utilise le network byte order, qui est big-endian :
+- Network To Host Short
+Le réseau utilise le network byte order, qui est en big-endian (byte de poids fort à droite). Pour le lire il faut donc le convertir :
+``` sh
+insert here ntohs function
 
+# memory view
        +----+----+
        | 12 | 34 |
        +----+----+
-
-
+```
 
 ## retrouver le code de ping :
 ```
