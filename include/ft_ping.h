@@ -77,11 +77,13 @@ typedef struct s_ping
 } t_ping;
 
 
-
+/*  parse_opts.c */
 void parse_opts(int argc, char *argv[], t_ping *ping);
 
-/*  do_ping.c */
+/*  resolve_dest.c */
 void resolve_dest(t_ping *ping);
+
+/*  loop.c */
 bool loop(t_ping *ping);
 
 /*  send.c */
@@ -89,8 +91,11 @@ unsigned short calculate_checksum(unsigned short *data, int count);
 bool send_packet(t_ping *ping, struct timeval *start_time);
 
 /*  receive.c */
-bool receive_packet(t_ping *ping, struct timeval *end_time);
 bool is_duplicate(t_ping *ping, uint16_t sequence_number);
+bool receive_packet(t_ping *ping, struct timeval *end_time);
+
+/*  print_stats.c */
+void print_stats(t_ping *ping);
 
 
 #endif

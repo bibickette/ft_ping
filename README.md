@@ -1,360 +1,660 @@
-simuler mauvaises conditions reseaux lo => localhost
-sudo tc qdisc add dev lo root netem loss 30%
-sudo tc qdisc add dev lo root netem delay 500ms
-sudo tc qdisc add dev lo root netem delay 100ms 50ms
-sudo tc qdisc add dev lo root netem delay 3000ms (tester -W)
+# Project presentation - `ft_ping`
+**Introduction**
 
-paquet dupplicata
-sudo tc qdisc add dev lo root netem duplicate 100%
-sudo tc qdisc replace dev enp0s1 root netem duplicate 50%
-
-corrupt
-sudo tc qdisc add dev lo root netem corrupt 50%
-
-observer les paquets
-sudo tcpdump -i lo -n -tt icmp
-sudo tcpdump -i enp0s1 -n -vv icmp
-
-icmp -> filtre les packets icmp 4
-
-remettre
-sudo tc qdisc del dev lo root
-
-voir
-sudo tc qdisc show
-sudo tc qdisc show dev enp0s1
+This README is organized as follows:
 
 
-tc qdisc add dev lo root netem delay 500ms
-│  │    │   │   │    │
-│  │    │   │   │    └── ajoute 500 ms de délai
-│  │    │   │   └────── netem = Network Emulator
-│  │    │   └────────── interface lo
-│  │    └────────────── ajoute
-│  └─────────────────── qdisc = queueing discipline
-└────────────────────── traffic control
+---
 
-dl le ping inetutils
+# Description
 
-wget https://ftp.gnu.org/gnu/inetutils/inetutils-2.0.tar.gz
-tar -xzf inetutils-2.0.tar.gz
-cd inetutils-2.0
-./configure
-make
-./ping/ping google.com
+`ft_ping` is a C project that consists of reimplementing the `ping` program
+from `inetutils-2.0`. The main purpose of `ping` is to check whether a
+machine is reachable over a network, and to measure how long it takes to
+get a response.
+
+`ping` is mainly used to:
+- check that a destination is reachable
+- check that it responds to ICMP requests
+- measure the RTT (Round Trip Time: the time between sending an Echo
+  Request and receiving the matching Echo Reply)
+- observe packet loss
+- retrieve information such as the TTL from the response
+
+```sh
+ping 8.8.8.8 # IP address of Google DNS
+
+        ICMP Echo Request
+   ┌─────────────────────────►
+   │                         │
+   │                      8.8.8.8
+   │                         │
+ PC│                         │
+   │                      responds
+   │                         │
+   ◄─────────────────────────┘
+        ICMP Echo Reply
+```
+
+## The OSI model: a common language for networked systems
+
+The OSI *(Open Systems Interconnection)* model represents the different
+functions required for two machines to communicate over a network. Each
+layer relies on the one below it and offers a service to the one above it.
+
+```
+┌──────────────────────────────┐
+│ 7. Application               │ HTTP, DNS, SSH, ping
+├──────────────────────────────┤
+│ 6. Presentation              │
+├──────────────────────────────┤
+│ 5. Session                   │
+├──────────────────────────────┤
+│ 4. Transport                 │ TCP, UDP
+├──────────────────────────────┤
+│ 3. Network                   │ IP, ICMP, IPv4
+├──────────────────────────────┤
+│ 2. Data Link                 │ Ethernet, ARP...
+├──────────────────────────────┤
+│ 1. Physical                  │ cable, fiber, radio...
+└──────────────────────────────┘
+```
+
+`ping` mainly relies on the **ICMP** protocol, which lives at the Network
+layer, alongside IP itself:
+
+- **ICMP** *(Internet Control Message Protocol)*: used to send control and
+  error messages at the IP level ("host unreachable", "TTL expired", Echo Request/Reply).
+- **IPv4** *(Internet Protocol version 4)*: handles addressing and routing
+  of packets across the network.
+
+An IPv4 packet carrying an ICMP message looks like this:
+
+```
+┌──────────────────────┐
+│ IPv4 Header          │
+├──────────────────────┤
+│ ICMP Header          │ ─┐
+├──────────────────────┤  ├─ ICMP message
+│ ICMP Payload         │ ─┘ (carried inside the IPv4 payload)
+└──────────────────────┘
+```
+
+The IPv4 header handles addressing and routing (source/destination IP,
+TTL, protocol number...), while everything below it (the ICMP header and
+payload) is the actual message being transported: type of message
+(Echo Request/Reply, Time Exceeded...), sequence number, and optional data.
+
+### Going further: what about ARP?
+
+ARP is not implemented in this project, but it's worth
+understanding why `ft_ping`'s packets can leave the machine at all.
+
+**ARP (Address Resolution Protocol)** operates one layer below IP, at the
+Data Link layer. Before an IP packet can physically travel over a local
+network (Ethernet/WiFi), the sending machine needs to know the destination's
+**MAC address** (its physical network hardware address); IP addresses
+alone mean nothing at that layer. ARP is the protocol that answers the
+question *"who has this IP address? what is your MAC address?"* by
+broadcasting a request on the local network.
+
+Since `ft_ping` uses a `SOCK_RAW` socket at the IP layer, the kernel
+handles ARP resolution and Ethernet framing underneath, completely
+transparently. You never interact with ARP directly; it's simply why
+raw IP packets are able to actually leave the machine on the wire.
+
+---
+
+# System Environment
+
+VM description:
+- **Host**: Debian Bullseye, built with QEMU
+- **Reference `ping`**: `inetutils-2.0` (`ping -V`)
+
+```sh
+➜  ft_ping git:(main) ✗ ping -V
+ping (GNU inetutils) 2.0
+Copyright (C) 2021 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+Written by Sergey Poznyakoff.
+```
+
+`ft_ping` needs to be run with `sudo` because creating a RAW socket
+requires the `CAP_NET_RAW` capability, reserved to root by default (see
+[RAW sockets](#raw-sockets) for more details).
+
+---
+
+# Repo Layout
+
+```sh
+.
+├── main.c
+├── Makefile
+├── README.md
+├── include
+│   └── ft_ping.h
+└── src
+    ├── loop.c
+    ├── parse_opts.c
+    ├── receive.c
+    ├── resolve_dest.c
+    └── send.c
+```
+
+---
+
+# How `ft_ping` works
+
+## RAW sockets
+
+A RAW socket is a type of socket that allows direct interaction with the
+network layer, bypassing the kernel's usual TCP/UDP handling. It lets a
+program craft and read custom packets (such as ICMP ones) instead of
+relying on a higher-level transport protocol.
+
+`ping` uses a RAW socket:
+```sh
+socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+
+# AF_INET
+#    │
+#    └──► IPv4
+
+# IPPROTO_ICMP
+#    │
+#    └──► ICMP protocol
+```
+
+Creating a `SOCK_RAW` socket requires elevated privileges: the kernel
+restricts it to processes holding the `CAP_NET_RAW` capability (root, or
+a binary granted this capability via `setcap cap_net_raw+ep`). This is
+why `ft_ping` needs to be run with `sudo` — crafting arbitrary IP-level
+packets is a capability the kernel doesn't hand out by default.
+
+Once the packet is sent, the kernel wraps the ICMP message inside an IPv4
+packet before it goes out on the wire. This is also what the receiving
+side gets back: reading from a RAW ICMP socket returns the **entire IPv4 packet**, not just the ICMP part. This gives access to:
+- the TTL
+- the source IP
+- the destination IP
+- the protocol
+- the ICMP header
+- the identifier
+- the sequence number
+- the payload
+
+Schematically:
+```
+    Application
+        │
+        │ RAW ICMP socket
+        ▼
+┌───────────────┐
+│ Linux Kernel │
+└───────┬───────┘
+        │
+        ▼
+    IPv4 + ICMP
+```
+
+## ICMP packet description
+
+`ping` mainly uses two ICMP messages: Echo Request and Echo Reply.
+
+|ICMP message | Type |Code |
+|---|---|---|
+|ICMP Echo Request|8| 0|
+|ICMP Echo Reply| 0| 0|
+
+ICMP packet layout:
+```
+byte  0               1               2               3
+bits  0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |     Type      |     Code      |           Checksum            |   
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ |---- ICMP header
+     |           Identifier          |        Sequence Number        |   
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                          Data / Payload                       |  
+```
 
 
-my original ping : iputils-ping
-ping in my machine : ping (GNU inetutils) 2.0
+**Checksum**: detects corruption of the ICMP message. It is computed over
+the **entire ICMP message — header and payload together**, not just the
+8-byte header. This matters both when building a packet and when
+verifying one: using the wrong length on either side produces a checksum
+mismatch even though the packet is perfectly valid.
 
-TEST MANDATORY :
-help
-sudo ./ft_ping -h localhost
-sudo ./ft_ping -help localhost
-sudo ./ft_ping --help localhost
-sudo ./ft_ping -? localhost
-sudo ./ft_ping "-?" localhost
-sudo ./ft_ping -dntexist localhost
-sudo ./ft_ping -h localhost pouet
+**Identifier**: identifies the requests belonging to one instance of
+`ping` (typically the process PID).
 
-verbose
-sudo ./ft_ping -v localhost
-sudo ./ft_ping -v localhost pouet
-sudo ./ft_ping -v 
+**Sequence Number**: identifies each individual packet. It's what allows
+matching a given reply to the request it responds to — especially
+important since replies are not guaranteed to arrive in order or on time.
+
+Workflow:
+```
+                ft_ping
+                    │
+                    │ 1. build ICMP Echo Request
+                    ▼
+          ┌───────────────────┐
+          │ ICMP Echo Request │
+          │ type = 8          │
+          │ seq = 0           │
+          |───────────────────|
+          | payload           |
+          └─────────┬─────────┘
+                    │
+                    ▼
+          ┌───────────────────┐
+          │    IPv4 Header    │    <--- kernel wraps the ICMP echo request in an IPv4 header
+          ├───────────────────┤
+          │ ICMP Echo Request │
+          └─────────┬─────────┘
+                    │
+                    │ network
+                    ▼
+              Destination
+                    │
+                    │ replies
+                    ▼
+          ┌───────────────────┐
+          │    IPv4 Header    │
+          ├───────────────────┤
+          │  ICMP Echo Reply  │
+          └─────────┬─────────┘
+                    │
+                    ▼
+                 ft_ping
+                    │
+                    ├── checks the source address
+                    ├── checks the ID
+                    ├── verifies the checksum
+                    ├── retrieves the TTL
+                    └── computes the RTT
+```
+
+### Packet send
+
+Structure of an ICMP header:
+```h
+/* from #include <netinet/ip_icmp.h> */
+struct icmphdr
+{
+  uint8_t type;		/* message type */
+  uint8_t code;		/* type sub-code */
+  uint16_t checksum;
+  union
+  {
+    struct
+    {
+      uint16_t	id;
+      uint16_t	sequence;
+    } echo;			/* echo datagram */
+    uint32_t	gateway;	/* gateway address */
+    struct
+    {
+      uint16_t	__glibc_reserved;
+      uint16_t	mtu;
+    } frag;			/* path mtu discovery */
+  } un;
+};
+```
+
+Structure of a packet:
+```c
+/* from send.c */
+
+struct ping_packet
+{
+    struct icmphdr icmp_hdr;
+    char payload[PAYLOAD_SIZE];
+};
+```
+
+Build the packet:
+```c
+/* from send.c */
+struct ping_packet packet = {
+        .icmp_hdr = {
+            .type = ICMP_ECHO,
+            .code = 0,
+            .checksum = 0,
+            .un = {.echo = {.id = htons(ping->pid), .sequence = htons(ping->sequence_number)}}},
+        .payload = {0}};
+
+gettimeofday(start_time, NULL);
+memmove((char *)&packet + sizeof(struct icmphdr), start_time, sizeof(*start_time)); // Copy the start time into the payload
+packet.icmp_hdr.checksum = calculate_checksum((unsigned short *)&packet, sizeof(packet));
+```
+
+Steps:
+1. build a packet with the PID of the program and the sequence number of
+   this packet (incremented after each send)
+2. copy the current timestamp into the packet's payload — **this is what makes the RTT calculation reliable later**: instead of relying on a
+   single "last sent time" variable that would get overwritten by the
+   next packet if a reply is delayed, the exact send time travels inside
+   the packet itself and comes back unchanged in the reply
+3. compute the checksum over the **whole packet** (header + payload)
+
+Packets are sent with a total size of 64 bytes (8-byte ICMP header + 56
+bytes of payload), matching the default size used by the reference
+`ping`.
+
+### Packet received
+
+IP structure of the received packet:
+```h
+/* from #include <netinet/ip.h> */
+struct iphdr
+  {
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+    unsigned int ihl:4;
+    unsigned int version:4;
+#elif __BYTE_ORDER == __BIG_ENDIAN
+    unsigned int version:4;
+    unsigned int ihl:4;
+#else
+# error	"Please fix <bits/endian.h>"
+#endif
+    uint8_t tos;
+    uint16_t tot_len;
+    uint16_t id;
+    uint16_t frag_off;
+    uint8_t ttl;
+    uint8_t protocol;
+    uint16_t check;
+    uint32_t saddr;
+    uint32_t daddr;
+  };
+```
+
+Retreive informations:
+1. locate the IP header:
+    ```c
+    /* from receive.c */
+    struct iphdr *ip_hdr = (struct iphdr *)buffer;
+    ```
+
+2. locate the ICMP header within the received packet:
+    ```c
+    /* from receive.c */
+    struct icmphdr *icmp = (struct icmphdr *)(buffer + ip_hdr->ihl * 4);
+    ```
+    IHL stands for Internet Header Length, expressed in 32-bit (4-byte) words.
+    The size of the IP header is therefore: `ihl value × word size (4 bytes)`.
+    Note that for a valid minimal IPv4 header, `ihl` is at least `5` (i.e. 20
+    bytes, with no IP options).
+
+3. extract the timestamp from the payload:
+    ```c
+    /* from receive.c */
+    char payload[56] = {0};
+    memmove(payload, buffer + ip_hdr->ihl * 4 + sizeof(struct icmphdr), sizeof(payload));
+    struct timeval *sent_time = (struct timeval *)payload;
+    ```
+
+The RTT is then simply `now - *sent_time`. Because the send time is read
+back from the reply itself rather than from a local variable, this stays
+correct even if replies arrive late or out of order.
+
+This is used to print the ping output:
+
+```
+64 bytes from 142.251.39.110: icmp_seq=0 ttl=255 rtt=4.275 ms
+```
+
+## TTL (Time To Live)
+
+The TTL is a field of the IPv4 header (8 bits, values from 0 to 255). It
+represents the maximum number of routers (hops) a packet is allowed to
+cross before being discarded.
+
+```
+┌─────────────────────────────┐
+│         IPv4 Header         │
+│            ...              │
+│          TTL = 64           │
+│        Protocol = ICMP      │
+│            ...              │
+└─────────────────────────────┘
+```
+
+Without a TTL, a misrouted packet (e.g. caught in a routing loop between
+two misconfigured routers) would circulate on the network indefinitely,
+consuming bandwidth without ever reaching its destination or being
+reported as lost.
+
+The TTL acts as a safeguard: every router that processes the packet
+**decrements the TTL by 1** before forwarding it. If the TTL reaches 0,
+the router discards the packet and sends an ICMP **Time Exceeded** (type 11) error message back to the sender, instead of letting the packet keep
+circulating.
+
+```
+PC                Routeur            Destination
+ │                   │                    │
+ │ TTL = 64          │                    │
+ ├──────────────────►│                    │
+ │                   │ TTL = 63           │
+ │                   ├───────────────────►│
+ │                   │                    │
+```
+
+### Values
+
+- **Starting TTL**: chosen by the sender when the ICMP packet is
+  encapsulated into IPv4. This starting value is not standardized and
+  depends on the OS/device that generated the packet:
+
+    | System                                  | Typical starting TTL |
+    |-------------------------------------------|-----------------------|
+    | Linux                                      | 64                    |
+    | Windows                                    | 128                   |
+    | Solaris / some network equipment            | 255                   |
+
+  This value can be overridden with the `-t`/`--ttl` flag (useful in
+  particular to force a low TTL and trigger a Time Exceeded error on
+  purpose) :
+    ```c
+    setsockopt(ping->socket_fd, IPPROTO_IP, IP_TTL, &ping->ttl, sizeof(int));
+    ```
+
+- **TTL in the reply**: this is the **remaining** value as read
+  from the packet **at the time it is received**, after all the
+  decrements performed by the routers it went through. This value never
+  needs to be computed — it is simply read directly from `ip_hdr->ttl`.
+
+## RTT and statistics
+
+The RTT measures the time between sending and receiving a packet. At the
+end of the program, `ping` prints its statistics:
+- **min**: the minimum observed RTT
+- **avg**: the average RTT
+- **max**: the maximum observed RTT
+- **stddev**: the standard deviation of the RTT values, i.e. how much
+  individual RTTs vary around the average — a low stddev means a stable
+  connection, a high one means the RTT fluctuates a lot between packets.
+  It is computed as:
+
+  ``` 
+  stddev = sqrt((rtt->total_squared / packets_received) - (avg_time * avg_time))
+  ```
+
+Example:
+```sh
+# ...
+64 bytes from 142.251.39.110: icmp_seq=9 ttl=255 rtt=7.629 ms
+--- google.com ping statistics ---
+10 packets transmitted, 10 received, 0% packet loss
+round-trip min/avg/max/stddev = 5.133/7.529/10.941/1.551 ms
+```
+
+## Byte order and conversion
+
+The network and the host machine may use a different byte order, so
+values need to be converted before being sent or after being received.
+
+- **Host To Network Short** (`htons`): a host typically stores multi-byte
+  values in little-endian order (least significant byte first in memory),
+  while network protocols always use big-endian ("network byte order",
+  most significant byte first). `htons` converts a 16-bit value from host
+  order to network order before it's placed in a packet:
+```c
+  // from send.c
+  .id = htons(ping->pid)
+```
+
+- **Network To Host Short** (`ntohs`): when reading a 16-bit value from a
+  received packet, it must be converted back from network byte order to
+  the host's own byte order before being used or printed:
+```c
+  // from receive.c
+  printf("icmp_seq=%u ", ntohs(icmp->un.echo.sequence));
+```
+
+## ping's source code from inetutils-2.0
+
+To retrieve the source code of `ping` from `inetutils-2.0` on Debian:
+
+```sh
+apt source inetutils
+```
+
+Then, inside the extracted folder, run `./configure` and `make`.
 
 
-normal environment
-sudo ./ft_ping -v localhost
-sudo ./ft_ping 8.8.8.8
-sudo ./ft_ping google.com
+---
 
-double ping
-sudo ./ft_ping google.com
-sudo ./ft_ping localhost
+# `ft_ping` usage
 
+## Allowed arguments
 
-package loss
-sudo ./ft_ping -v 10.255.255.1
+| Flag                          | Description |
+|--------------------------------|--------------|
+| `-?`, `-h`, `--help`           | display help |
+| `-v`, `--verbose`              | enable verbose output (view packet errors and PID) |
+| `-w`, `--timeout=N`            | stop the whole program after N seconds have elapsed, regardless of how many packets were sent |
+| `-W`, `--linger=N`             | number of seconds to keep waiting for pending replies, once all packets have already been sent |
+| `-i`, `--interval=NUMBER`      | wait NUMBER seconds between sending each packet |
+| `-c`, `--count=NUMBER`         | stop after sending NUMBER packets (still respecting `-W` linger time afterwards) |
+| `-t`, `--ttl=N`                | specify N as the outgoing time-to-live (set via `setsockopt`) |
 
+### On `-w` vs `-W`
 
-no internet
-sudo ./ft_ping google.com
+These two flags are easy to confuse, so it's worth being precise:
 
-loss environment
-sudo tc qdisc add dev lo root netem loss 30%
-sudo ./ft_ping localhost
+- **`-w` (timeout)**: a hard deadline for the **entire program**. Once N
+  seconds have passed since the program started, `ping` stops
+  unconditionally and prints its statistics — no matter how many packets
+  were sent or how many replies are still pending.
+- **`-W` (linger)**: only relevant **after the last packet has already been sent** (either because `-c` was reached, or `-w` fired). It's the
+  extra grace period `ping` waits for the *remaining* replies to trickle
+  in, before finally printing statistics and exiting.
 
+This is directly reflected in `inetutils-2.0`'s own source:
 
-delay environment
-sudo tc qdisc add dev lo root netem delay 500ms
-sudo tc qdisc add dev lo root netem delay 100ms 50ms
-sudo tc qdisc add dev lo root netem delay 1500ms
-sudo tc qdisc add dev lo root netem delay 10000ms
+```c
+if (!ping->ping_count || ping->ping_num_xmit < ping->ping_count)
+  // still sending packets normally
+else if (finishing)
+  // already in the linger phase, waiting it out
+else
+  {
+    finishing = 1;
+    intvl.tv_sec = linger;   // switch to the -W linger duration
+  }
+```
 
-duplicate environment
-sudo tc qdisc add dev lo root netem duplicate 100%
+> **Important:** `-W` does **not** work as a per-packet "discard if late"
+> filter. It only controls how long `ping` actively blocks waiting for a
+> given reply before moving on to the next step. A reply that arrives
+> after `-W` has already elapsed is still read from the socket and
+> displayed with its real (possibly very large) RTT the next time the
+> program checks for incoming data — it is never silently dropped just
+> for being late.
+
+### `Ctrl+C` handling
+
+`SIGINT` (`Ctrl+C`) is handled gracefully: instead of terminating
+abruptly, `ft_ping` prints its final statistics (packets transmitted/
+received, packet loss, round-trip min/avg/max/stddev) before exiting
+cleanly — matching the reference `ping`'s behavior.
+
+---
+
+# Simulating network conditions for testing
+
+**NetEm** (Network Emulator) is a Linux feature used through `tc`
+(traffic control) to emulate degraded or specific network conditions —
+useful to test `ft_ping` against packet loss, delay, duplication, or
+corruption without needing a real unreliable network.
+
+```sh
+sudo tc qdisc replace dev XX root netem
+ │   │    │      │     │      │    └── use the Network Emulator
+ │   │    │      │     │      └── root queueing discipline of this interface
+ │   │    │      │     └── the network interface being configured
+ │   │    │      └── replace the existing configuration
+ │   │    └── Queueing Discipline (defines how packets are managed)
+ │   └── Traffic Control (Linux tool used to configure it)
+ └── run with administrator privileges
+```
+
+`dev XX`: the interface to modify — e.g. `enp0s1` for the VM's routed
+interface, or `lo` for localhost.
+
+```sh
+sudo tc qdisc replace dev XX root netem delay XX corrupt XX duplicate XX
+```
+
+| Parameter   | Example              | Definition |
+|-------------|-----------------------|------------|
+| `delay`     | `delay 100ms` or `delay 150ms 50ms` | adds artificial latency to packets (optionally with jitter) |
+| `loss`      | `loss 20%`            | simulates random packet loss |
+| `duplicate` | `duplicate 50%`       | duplicates a percentage of packets |
+| `corrupt`   | `corrupt 30%`         | randomly corrupts packet content (triggers checksum mismatches — useful to test `-v`'s error handling) |
+
+Examples:
+```sh
+sudo tc qdisc replace dev lo root netem delay 200ms 50ms
+sudo tc qdisc replace dev lo root netem duplicate 50% delay 50ms
 sudo tc qdisc replace dev lo root netem duplicate 50%
-
-packet not in right order
-sudo tc qdisc add dev lo root netem delay 100ms 1000ms distribution normal
-
-
-
-
-QUE FAIT -W EXACTEMENT ?
-Timeout pour select, si rien ne se passe apres -W secondes, le programme s'arrete
-si des paquets continue d'etre envoyés, le programme continue et les recoit
-si il y a -c, le programme sarreter apres -c paquet envoyé puis -W s attendue
-COMMENT TESTER ?
-sudo tc qdisc add dev lo root netem delay 15000ms
-offre un delay aller 15s + retour 15s sur le reseau
-le -W de base est de 10s
-pour tester correctement, il faut envoyer un nombre de paquet exemple 1
-
-./inetutils-2.0/ping/ping -c 1 localhost
--> le programme va sarreter a 10s (W de base), il naura pas le temps de recevoir le paquet puisquil prends 30s
-./inetutils-2.0/ping/ping -c 1 -W 1 localhost
--> le programme va sarreter a 1s apres le dernier paquet envoyé
-./inetutils-2.0/ping/ping -W 1 localhost
--> le programme recoit les ping en delay et cest > à 1s
-
-
-
-
-
-
-
-
-
-
-
-Oui. tc est un outil Linux qui permet de contrôler la façon dont les paquets sont mis en file et transmis par une interface réseau. Avec netem, tu peux volontairement ajouter du délai, de la perte, de la corruption, des duplications, etc. C'est parfait pour tester ton ping.
-
-Prenons :
-
-sudo tc qdisc add dev lo root netem delay 3000ms
-
-Décomposons :
-
-tc
-
-C'est Traffic Control.
-
-Il permet de configurer les queuing disciplines (QDisc), c'est-à-dire la manière dont Linux gère les paquets qui passent par une interface réseau.
-
-En gros :
-
-ton programme
-    ↓
-socket
-    ↓
-réseau Linux
-    ↓
-[ QDisc / tc ]
-    ↓
-interface réseau
-    ↓
-réseau
-
-tc te permet donc d'insérer des comportements artificiels à cet endroit.
-
-qdisc
-
-Abréviation de queueing discipline.
-
-tc qdisc
-
-signifie que tu veux manipuler la discipline de file d'attente d'une interface.
-
-Tu peux par exemple avoir :
-
-pfifo
-fq_codel
-htb
-netem
-
-Dans ton cas tu utilises netem.
-
-add
-tc qdisc add
-
-Ça veut dire :
-
-Ajoute une nouvelle qdisc.
-
-Donc :
-
-tc qdisc add ...
-
-≠ modifier une qdisc existante.
-
-Pour modifier une qdisc existante, tu peux utiliser change :
-
-tc qdisc change ...
-dev lo
-
-dev signifie device, donc l'interface réseau concernée.
-
-dev lo
-
-veut dire :
-
-applique cette configuration à l'interface lo.
-
-lo est l'interface loopback :
-
-127.0.0.1
-    ↕
-   lo
-
-C'est pour ça que tes tests avec :
-
-ping localhost
-
-sont affectés.
-
-Pour voir tes interfaces :
-
-ip link
-
-Tu verras par exemple :
-
-lo
-enp0s1
-eth0
-...
-root
-
-C'est probablement le morceau le plus important à comprendre.
-
-root
-
-veut dire :
-
-cette qdisc devient la qdisc principale (racine) de cette interface.
-
-Tu peux imaginer une arborescence :
-
-                 interface lo
-                     │
-                    root
-                     │
-                  netem
-                 /  |  \
-              delay loss duplicate
-
-Quand tu fais :
-
-tc qdisc add dev lo root netem ...
-
-tu demandes donc :
-
-Mets netem comme qdisc racine de lo.
-
-netem
-
-netem signifie Network Emulator.
-
-C'est lui qui permet de simuler des problèmes réseau.
-
-Par exemple :
-
-netem delay 100ms
-
-→ ajoute du délai.
-
-netem loss 20%
-
-→ perd environ 20 % des paquets.
-
-netem duplicate 50%
-
-→ duplique des paquets.
-
-netem corrupt 50%
-
-→ corrompt des paquets.
-
-Tu peux même combiner :
-
-sudo tc qdisc add dev lo root netem delay 100ms loss 10%
-delay 3000ms
-
-Enfin :
-
-delay 3000ms
-
-est le paramètre de netem.
-
-Ça signifie :
-
-introduis environ 3 secondes de délai.
-
-Donc :
-
-sudo tc qdisc add dev lo root netem delay 3000ms
-
-donne :
-
-                  lo
-                   │
-                   ▼
-              ┌─────────┐
-              │  netem  │
-              │         │
-              │ delay   │
-              │ 3000 ms │
-              └────┬────┘
-                   │
-                   ▼
-              paquet transmis
-
-Et dans tes tests ping
-
-Quand tu fais :
-
-sudo tc qdisc add dev lo root netem delay 3000ms
-
-tu ne modifies pas le paquet ICMP lui-même.
-
-Tu modifies le comportement de l'interface réseau :
-
-            ping
-            │
-            │ ICMP Echo Request
-            ▼
-        ┌──────────────┐
-        │ Linux / lo   │
-        │              │
-        │    netem     │ ← attend ~3 s
-        │    delay     │
-        └──────┬───────┘
-            │
-            ▼
-            paquet
-
-C'est pour ça que tcpdump est très utile : tu peux voir à quel moment le paquet entre/sort réellement.
-
-Petit résumé
-
-Pour :
-
-sudo tc qdisc add dev lo root netem delay 3000ms
-Élément	Signification
-tc	Traffic Control
-qdisc	Queueing Discipline
-add	Ajouter
-dev	Interface réseau
-lo	Interface loopback
-root	Qdisc racine de l'interface
-netem	Network Emulator
-delay	Ajouter un délai
-3000ms	3 secondes
-
-Et pour remettre lo comme avant :
-
+sudo tc qdisc replace dev lo root netem duplicate 50% corrupt 50%
+sudo tc qdisc replace dev lo root netem delay 200ms 50ms corrupt 30% duplicate 30%
+```
+
+Remove the emulated environment:
+```sh
 sudo tc qdisc del dev lo root
+```
+
+Observe packet traffic while testing:
+```sh
+sudo tcpdump -i XX -n -tt icmp   # -tt: print raw Unix timestamps
+sudo tcpdump -i XX -n -vv icmp   # -vv: verbose output, includes checksum validity
+```
+
+`-n` avoids resolving hostnames (faster, and avoids interference from
+DNS lookups while testing). `-vv` is particularly useful for checksum
+debugging: tcpdump explicitly reports `wrong icmp cksum` if a captured
+packet's checksum doesn't match its content, which tells you immediately
+whether an "invalid checksum" bug is on the sending side (bad packet on
+the wire) or on `ft_ping`'s own verification logic (packet is actually
+fine).
+
+---
+
+# How to Use `ft_ping`
+
+1. Clone `ft_ping` in a folder first  : `git clone https://github.com/bibickette/ft_ping.git`
+2. Go to folder and compile it : `cd ft_ping && make`
+3. Run it with root permission: `sudo ./ft_ping [flags...] <destination>` *(see [allowed arguments](#allowed-arguments) for more details)*
 
 
-
-on remarque que ping count cest package sent and package received + duplicata
+* * *
+ 
+*Project validation date: TBD*

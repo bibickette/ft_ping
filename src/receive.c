@@ -27,7 +27,7 @@ static bool is_echo_from_myself(struct icmphdr *receive_data, uint16_t pid)
     return ((receive_data->type == ICMP_ECHO && receive_data->un.echo.id == htons(pid)));
 }
 
-static bool is_my_pid(struct icmphdr *receive_data, uint16_t pid)
+static bool is_for_my_pid(struct icmphdr *receive_data, uint16_t pid)
 {
     return (receive_data->un.echo.id == htons(pid));
 }
@@ -37,7 +37,7 @@ bool is_duplicate(t_ping *ping, uint16_t sequence_number)
     return ping->sequence_received[sequence_number % MAX_RECV_SEQ_SAVE];
 }
 
-void fill_rtt(t_rtt *rtt, double time_packet)
+static void fill_rtt(t_rtt *rtt, double time_packet)
 {
     if (rtt->min == 0 || time_packet < rtt->min)
     {
@@ -60,7 +60,7 @@ enum packet_error
     ERR_NOT_ECHOREPLY = 5
 };
 
-void handle_error(int error, int mode, uint16_t pid, struct icmphdr *icmp, struct sockaddr_in from_addr, struct sockaddr_in recv_addr, struct iphdr *ip_hdr)
+static void handle_error(int error, int mode, uint16_t pid, struct icmphdr *icmp, struct sockaddr_in from_addr, struct sockaddr_in recv_addr, struct iphdr *ip_hdr)
 {
     if (!(mode & OPT_VERBOSE) && error != ERR_CHECKSUM_INVALID)
     {
@@ -74,11 +74,12 @@ void handle_error(int error, int mode, uint16_t pid, struct icmphdr *icmp, struc
         case ERR_ECHO_FROM_MYSELF:
             printf("%secho request from myself, icmp_seq : %u%s\n", YELLOW, ntohs(icmp->un.echo.sequence), RESET);
             return;
+        case ERR_NOT_ECHOREPLY:
+            // here handle different type
+            printf("%snot an echo reply, icmp type : %d%s\n", YELLOW, icmp->type, RESET);
+            return;
         case ERR_NOT_MY_PID:
             printf("%sping from unexpected pid : %d - src pid : %d%s\n", YELLOW, ntohs((uint16_t)icmp->un.echo.id), pid, RESET);
-            return;
-        case ERR_NOT_ECHOREPLY:
-            printf("%snot an echo reply, icmp type : %d%s\n", YELLOW, icmp->type, RESET);
             return;
         case ERR_ADDR_MISMATCH:
         {
@@ -108,6 +109,39 @@ void handle_error(int error, int mode, uint16_t pid, struct icmphdr *icmp, struc
     }
 }
 
+static bool packet_checker(t_ping *ping, struct icmphdr *icmp, struct sockaddr_in recv_addr, struct iphdr *ip_hdr, int icmp_len)
+{
+    int error = 0;
+
+    if (is_echo_from_myself(icmp, ping->pid))
+    {
+        error = ERR_ECHO_FROM_MYSELF;
+    }
+    else if (icmp->type != ICMP_ECHOREPLY)
+    {
+        error = ERR_NOT_ECHOREPLY;
+    }
+    else if (!is_for_my_pid(icmp, ping->pid))
+    {
+        error = ERR_NOT_MY_PID;
+    }
+    else if (!is_addr_match(&ping->addr, &recv_addr) && !is_ip_match(ip_hdr->saddr, ip_hdr->daddr))
+    {
+        error = ERR_ADDR_MISMATCH;
+    }
+    else if (!verify_checksum(icmp, icmp_len))
+    {
+        error = ERR_CHECKSUM_INVALID;
+    }
+
+    if (error)
+    {
+        handle_error(error, ping->mode, ping->pid, icmp, ping->addr, recv_addr, ip_hdr);
+        return true;
+    }
+    return false;
+}
+
 bool receive_packet(t_ping *ping, struct timeval *end_time)
 {
     char buffer[RECV_BUFFER_SIZE] = {0};
@@ -123,40 +157,11 @@ bool receive_packet(t_ping *ping, struct timeval *end_time)
     }
 
     struct iphdr *ip_hdr = (struct iphdr *)buffer;
-    // struct ip *ip2 = (struct ip *)buffer;
-    // printf("ttl ip header = %d\n", ip2->ip_ttl);
-    // ip_hdr->ihl * 4 -> gives the size of the IP header in bytes, so we can use it to find the start of the ICMP header in the received packet.
     struct icmphdr *icmp = (struct icmphdr *)(buffer + ip_hdr->ihl * 4);
-    // Length of the ICMP packet icmp header + payload
     int icmp_len = result - ip_hdr->ihl * 4;
-    int error = 0;
-    // 1. verify type and id
-    // 2. verify source address
-    // 3. verify checksum
-    if (is_echo_from_myself(icmp, ping->pid))
-    {
-        error = ERR_ECHO_FROM_MYSELF;
-    }
-    else if (!is_my_pid(icmp, ping->pid))
-    {
-        error = ERR_NOT_MY_PID;
-    }
-    else if (icmp->type != ICMP_ECHOREPLY)
-    {
-        error = ERR_NOT_ECHOREPLY;
-    }
-    else if (!is_addr_match(&ping->addr, &recv_addr) && !is_ip_match(ip_hdr->saddr, ip_hdr->daddr))
-    {
-        error = ERR_ADDR_MISMATCH;
-    }
-    else if (!verify_checksum(icmp, icmp_len))
-    {
-        error = ERR_CHECKSUM_INVALID;
-    }
 
-    if (error)
+    if (packet_checker(ping, icmp, recv_addr, ip_hdr, icmp_len))
     {
-        handle_error(error, ping->mode, ping->pid, icmp, ping->addr, recv_addr, ip_hdr);
         return true;
     }
 
