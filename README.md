@@ -2,7 +2,27 @@
 **Introduction**
 
 This README is organized as follows:
-
+- [Description](#description)
+  - [The OSI model: a common language for networked systems](#the-osi-model-a-common-language-for-networked-systems)
+    - [Going further: what about ARP?](#going-further-what-about-arp)
+- [System Environment](#system-environment)
+- [Repo Layout](#repo-layout)
+- [How `ft_ping` works](#how-ft_ping-works)
+  - [RAW sockets](#raw-sockets)
+  - [ICMP packet description](#icmp-packet-description)
+    - [Packet send](#packet-send)
+    - [Packet received](#packet-received)
+  - [TTL (Time To Live)](#ttl-time-to-live)
+    - [Values](#values)
+  - [RTT and statistics](#rtt-and-statistics)
+  - [Byte order and conversion](#byte-order-and-conversion)
+  - [ping's source code from inetutils-2.0](#pings-source-code-from-inetutils-20)
+- [`ft_ping` usage](#ft_ping-usage)
+  - [Allowed arguments](#allowed-arguments)
+    - [On `-w` vs `-W`](#on--w-vs--w)
+    - [`Ctrl+C` handling](#ctrlc-handling)
+- [Simulating network conditions for testing](#simulating-network-conditions-for-testing)
+- [How to Use `ft_ping`](#how-to-use-ft_ping)
 
 ---
 
@@ -373,7 +393,7 @@ struct iphdr
   };
 ```
 
-Retreive informations:
+Retrieve information:
 1. locate the IP header:
     ```c
     /* from receive.c */
@@ -435,7 +455,7 @@ the router discards the packet and sends an ICMP **Time Exceeded** (type 11) err
 circulating.
 
 ```
-PC                Routeur            Destination
+PC                Router            Destination
  │                   │                    │
  │ TTL = 64          │                    │
  ├──────────────────►│                    │
@@ -516,7 +536,7 @@ values need to be converted before being sent or after being received.
   printf("icmp_seq=%u ", ntohs(icmp->un.echo.sequence));
 ```
 
-## ping's source code from inetutils-2.0
+## `ping`'s source code from inetutils-2.0
 
 To retrieve the source code of `ping` from `inetutils-2.0` on Debian:
 

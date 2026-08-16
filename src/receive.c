@@ -77,6 +77,21 @@ static void handle_error(int error, int mode, uint16_t pid, struct icmphdr *icmp
         case ERR_NOT_ECHOREPLY:
             // here handle different type
             printf("%snot an echo reply, icmp type : %d%s\n", YELLOW, icmp->type, RESET);
+                        char expected_ip_addr[INET_ADDRSTRLEN];
+            char received_ip_addr[INET_ADDRSTRLEN];
+            char received_ip_packet[INET_ADDRSTRLEN];
+            char expected_ip_packet[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, &from_addr.sin_addr,
+                      expected_ip_addr, sizeof(expected_ip_addr));
+            inet_ntop(AF_INET, &recv_addr.sin_addr,
+                      received_ip_addr, sizeof(received_ip_addr));
+
+            inet_ntop(AF_INET, &ip_hdr->saddr,
+                      received_ip_packet, sizeof(received_ip_packet));
+            inet_ntop(AF_INET, &ip_hdr->daddr,
+                      expected_ip_packet, sizeof(expected_ip_packet));
+            printf("%secho reply from unexpected ip :\n    - data in addr src : %s - dst ip : %s\n    - data in packet dst : %s - src : %s%s\n", YELLOW, received_ip_addr, expected_ip_addr, received_ip_packet, expected_ip_packet, RESET);
+            
             return;
         case ERR_NOT_MY_PID:
             printf("%sping from unexpected pid : %d - src pid : %d%s\n", YELLOW, ntohs((uint16_t)icmp->un.echo.id), pid, RESET);
@@ -160,6 +175,7 @@ bool receive_packet(t_ping *ping, struct timeval *end_time)
     struct icmphdr *icmp = (struct icmphdr *)(buffer + ip_hdr->ihl * 4);
     int icmp_len = result - ip_hdr->ihl * 4;
 
+    printf("result: %d\n", result);
     if (packet_checker(ping, icmp, recv_addr, ip_hdr, icmp_len))
     {
         return true;
