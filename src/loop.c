@@ -10,23 +10,13 @@ static void sigint_handler(int sig)
 }
 
 /* calcul si le current time - start time est > timeout_sec */
-bool is_timeout(struct timeval *start_time, double timeout_millisec)
+static bool is_timeout(struct timeval *start_time, double timeout_millisec)
 {
     struct timeval current_time;
     gettimeofday(&current_time, NULL);
     double elapsed_time = (current_time.tv_sec - start_time->tv_sec) * 1000 + (current_time.tv_usec - start_time->tv_usec) / 1000;
     return (elapsed_time >= timeout_millisec);
 }
-
-// fd set
-// fd zero
-// si mon dernier paquet est envoyé a > timeout => envoyer un autre
-// res = select
-// if res < 0 && errno != EINTR => perror
-// si res == 0 -> continue => timeout de select => envoyer un autre paquet
-// if res > 0 => receive_packet
-// receive packet : si pas mon paquet => continue
-// si mon paquet => afficher le rtt et les infos
 
 /*
     calculate remaining time to wait in the select
@@ -37,7 +27,6 @@ bool is_timeout(struct timeval *start_time, double timeout_millisec)
 static void calculate_time_to_wait(struct timeval *start_time, struct timeval *resp_time, ssize_t interval_ms)
 {
     struct timeval intvl, now;
-
     gettimeofday(&now, NULL);
 
     intvl.tv_sec = interval_ms / MILLISEC_PRECISION;                         // convert milliseconds to seconds
@@ -72,6 +61,7 @@ bool loop(t_ping *ping)
     int res = 0;
     int finish = 0;
     ssize_t interval_ms = ping->interval_ms;
+
     gettimeofday(&program_start_time, NULL);
     if (!send_packet(ping, &last_send))
     {
@@ -107,10 +97,6 @@ bool loop(t_ping *ping)
         }
         else if (res == 0)
         {
-            // si select na pas recu de paquet pendant -W temps -> alors cest la fin SI on nenvoie pu de paquet
-            // si select recoit rien depuis X temps ET si on a pas de count alors on continue
-            // -W peut changer ce temps
-            // -W ne controle pas si laller retour est > a timeout, cest juste pour le select
             if ((ping->timeout_s > 0 && is_timeout(&program_start_time, ping->timeout_s * MILLISEC_PRECISION)))
             {
                 break;
@@ -140,12 +126,11 @@ bool loop(t_ping *ping)
         }
         else
         {
-
             if (!receive_packet(ping, &last_receive))
             {
                 return false;
             }
-            if (ping->count > 0 && ping->count <= (ping->packets_received + ping->duplicates))
+            if (ping->count > 0 && ping->count <= (ping->packets_received + ping->duplicates + ping->packets_error))
             {
                 break;
             }
@@ -153,7 +138,6 @@ bool loop(t_ping *ping)
             {
                 break;
             }
-            
         }
     }
     return true;

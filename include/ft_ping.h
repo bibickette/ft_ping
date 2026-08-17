@@ -71,6 +71,7 @@ typedef struct s_ping
 
     ssize_t packets_sent;
     ssize_t packets_received;
+    ssize_t packets_error;
 
     t_rtt rtt;
     

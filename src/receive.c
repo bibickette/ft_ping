@@ -5,6 +5,15 @@
 #include <netinet/ip_icmp.h>
 #include <netinet/ip.h>
 
+enum packet_error
+{
+    ERR_ECHO_FROM_MYSELF = 1,
+    ERR_NOT_MY_PID = 2,
+    ERR_ADDR_MISMATCH = 3,
+    ERR_CHECKSUM_INVALID = 4,
+    ERR_NOT_ECHOREPLY = 5
+};
+
 // si on recalcule le checksun et quon tombe sur 0 c'est que le checksum est valide
 static bool verify_checksum(struct icmphdr *receive_data, int icmp_len)
 {
@@ -51,14 +60,20 @@ static void fill_rtt(t_rtt *rtt, double time_packet)
     rtt->total_squared += time_packet * time_packet;
 }
 
-enum packet_error
+static char *icmp_type_to_string(uint8_t type)
 {
-    ERR_ECHO_FROM_MYSELF = 1,
-    ERR_NOT_MY_PID = 2,
-    ERR_ADDR_MISMATCH = 3,
-    ERR_CHECKSUM_INVALID = 4,
-    ERR_NOT_ECHOREPLY = 5
-};
+    switch (type)
+    {
+    case ICMP_DEST_UNREACH:
+        return "Destination Unreachable";
+    case ICMP_TIME_EXCEEDED:
+        return "Time Exceeded";
+    case ICMP_PARAMETERPROB:
+        return "Parameter Problem";
+    default:
+        return "Unknown Type";
+    }
+}
 
 static void handle_error(int error, int mode, uint16_t pid, struct icmphdr *icmp, struct sockaddr_in from_addr, struct sockaddr_in recv_addr, struct iphdr *ip_hdr)
 {
@@ -73,25 +88,6 @@ static void handle_error(int error, int mode, uint16_t pid, struct icmphdr *icmp
         {
         case ERR_ECHO_FROM_MYSELF:
             printf("%secho request from myself, icmp_seq : %u%s\n", YELLOW, ntohs(icmp->un.echo.sequence), RESET);
-            return;
-        case ERR_NOT_ECHOREPLY:
-            // here handle different type
-            printf("%snot an echo reply, icmp type : %d%s\n", YELLOW, icmp->type, RESET);
-                        char expected_ip_addr[INET_ADDRSTRLEN];
-            char received_ip_addr[INET_ADDRSTRLEN];
-            char received_ip_packet[INET_ADDRSTRLEN];
-            char expected_ip_packet[INET_ADDRSTRLEN];
-            inet_ntop(AF_INET, &from_addr.sin_addr,
-                      expected_ip_addr, sizeof(expected_ip_addr));
-            inet_ntop(AF_INET, &recv_addr.sin_addr,
-                      received_ip_addr, sizeof(received_ip_addr));
-
-            inet_ntop(AF_INET, &ip_hdr->saddr,
-                      received_ip_packet, sizeof(received_ip_packet));
-            inet_ntop(AF_INET, &ip_hdr->daddr,
-                      expected_ip_packet, sizeof(expected_ip_packet));
-            printf("%secho reply from unexpected ip :\n    - data in addr src : %s - dst ip : %s\n    - data in packet dst : %s - src : %s%s\n", YELLOW, received_ip_addr, expected_ip_addr, received_ip_packet, expected_ip_packet, RESET);
-            
             return;
         case ERR_NOT_MY_PID:
             printf("%sping from unexpected pid : %d - src pid : %d%s\n", YELLOW, ntohs((uint16_t)icmp->un.echo.id), pid, RESET);
@@ -132,10 +128,6 @@ static bool packet_checker(t_ping *ping, struct icmphdr *icmp, struct sockaddr_i
     {
         error = ERR_ECHO_FROM_MYSELF;
     }
-    else if (icmp->type != ICMP_ECHOREPLY)
-    {
-        error = ERR_NOT_ECHOREPLY;
-    }
     else if (!is_for_my_pid(icmp, ping->pid))
     {
         error = ERR_NOT_MY_PID;
@@ -148,13 +140,55 @@ static bool packet_checker(t_ping *ping, struct icmphdr *icmp, struct sockaddr_i
     {
         error = ERR_CHECKSUM_INVALID;
     }
-
     if (error)
     {
         handle_error(error, ping->mode, ping->pid, icmp, ping->addr, recv_addr, ip_hdr);
         return true;
     }
     return false;
+}
+
+static void handle_wrong_type(t_ping *ping, int result, char *buffer)
+{
+    struct iphdr *ip_hdr = (struct iphdr *)buffer;
+    struct icmphdr *icmp = (struct icmphdr *)(buffer + ip_hdr->ihl * 4);
+    struct iphdr *orig_ip_hdr = (struct iphdr *)((unsigned char *)icmp + sizeof(struct icmphdr));
+    struct icmphdr *orig_icmp = (struct icmphdr *)((unsigned char *)orig_ip_hdr + sizeof(struct iphdr));
+
+    if (!is_for_my_pid(orig_icmp, ping->pid))
+    {
+        return;
+    }
+    if (icmp->type == ICMP_DEST_UNREACH || icmp->type == ICMP_TIME_EXCEEDED || icmp->type == ICMP_PARAMETERPROB)
+    {
+        ping->packets_error++; // increment lost packets count since we received a non-echo reply packet
+        if(!(ping->mode & OPT_VERBOSE))
+        {
+            return;
+        }        
+        printf("%d bytes from %s: %s\n", result - ip_hdr->ihl * 4, inet_ntoa(*(struct in_addr *)&ip_hdr->saddr), icmp_type_to_string(icmp->type));
+        printf("IP Hdr Dump:\n ");
+        for (int i = 0; i < 20 && i < result; i++)
+        {
+            printf("%02x", (unsigned char)buffer[i]);
+            if (i % 2 == 1)
+                printf(" ");
+        }
+        char src[INET_ADDRSTRLEN];
+        char dst[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &orig_ip_hdr->saddr, src, sizeof(src));
+        inet_ntop(AF_INET, &orig_ip_hdr->daddr, dst, sizeof(dst));
+
+        printf("\nVr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst     Data\n");
+        printf(" %1x  %1x  %02x", orig_ip_hdr->version, orig_ip_hdr->ihl, orig_ip_hdr->tos);
+        printf(" %04x %04x", ntohs(orig_ip_hdr->tot_len), ntohs(orig_ip_hdr->id));
+        printf("   %1x %04x", (ntohs(orig_ip_hdr->frag_off) & 0xe000) >> 13, ntohs(orig_ip_hdr->frag_off) & 0x1fff);
+        printf("  %02x  %02x %04x", orig_ip_hdr->ttl, orig_ip_hdr->protocol, ntohs(orig_ip_hdr->check));
+        printf(" %s ", src);
+        printf(" %s ", dst);
+        printf("\n");
+        printf("ICMP: type: %d, code: %d, size: %d, id: 0x%04x, seq: 0x%04x\n", orig_icmp->type, orig_icmp->code, ntohs(orig_ip_hdr->tot_len) - orig_ip_hdr->ihl * 4, ntohs(orig_icmp->un.echo.id), ntohs(orig_icmp->un.echo.sequence));
+    }
 }
 
 bool receive_packet(t_ping *ping, struct timeval *end_time)
@@ -175,21 +209,23 @@ bool receive_packet(t_ping *ping, struct timeval *end_time)
     struct icmphdr *icmp = (struct icmphdr *)(buffer + ip_hdr->ihl * 4);
     int icmp_len = result - ip_hdr->ihl * 4;
 
-    printf("result: %d\n", result);
-    if (packet_checker(ping, icmp, recv_addr, ip_hdr, icmp_len))
+    if (icmp->type != ICMP_ECHOREPLY && icmp->type != ICMP_ECHO)
+    {
+        handle_wrong_type(ping, result, buffer);
+        return true;
+    }
+    else if (packet_checker(ping, icmp, recv_addr, ip_hdr, icmp_len))
     {
         return true;
     }
 
     char payload[56] = {0};
-    // mettre le time de l'envoi dans le payload et le recupere ici pour calculer le rtt
     memmove(payload, buffer + ip_hdr->ihl * 4 + sizeof(struct icmphdr), sizeof(payload));
     struct timeval *sent_time = (struct timeval *)payload;
 
     gettimeofday(end_time, NULL);
     double time_packet = (end_time->tv_sec - sent_time->tv_sec) * 1000.0 + (end_time->tv_usec - sent_time->tv_usec) / 1000.0;
 
-    // printf("%d bytes; ", result);
     printf("%d bytes from %s: ", result - ip_hdr->ihl * 4, inet_ntoa(recv_addr.sin_addr));
     printf("icmp_seq=%u ", ntohs(icmp->un.echo.sequence));
     printf("ttl=%u ", ip_hdr->ttl);
