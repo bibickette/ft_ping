@@ -18,15 +18,19 @@
 
 /* time to and select */
 #define TIMEOUT_SEC 1
+
 /* linger time default */
 // inetutils-2.0/ping/ping_common.h:#define MAXWAIT         10
 #define LINGER_TIME 10
+
 #define MILLISEC_PRECISION 1000
+
 /* maximum number of received sequence numbers to save, permet to control duplicates */
 #define MAX_RECV_SEQ_SAVE 1024
 
 /* buffer size to receive */
 #define RECV_BUFFER_SIZE 1024
+
 /* payload size in icmp packet */
 #define PAYLOAD_SIZE 56
 

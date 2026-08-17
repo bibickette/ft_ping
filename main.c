@@ -29,11 +29,3 @@ int main(int argc, char *argv[])
     }
     return 0;
 }
-
-/*
-todo:
-- gerer les cas qui ne sont pas echo reply : la structure de l'icmp est differente, donc il faut gerer ca
-- clean le code
-- retester
-
-*/

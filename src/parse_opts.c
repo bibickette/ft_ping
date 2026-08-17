@@ -10,11 +10,11 @@ static void print_help()
     printf("  <destination>             DNS name or IP address\n");
     printf("  -?, -h, --help            Print help and exit\n");
     printf("  -v, --verbose             Enable verbose output\n");
-    printf("  -c, --count <value>       to define\n");
-    printf("  -W, --linger <value>      to define\n");
-    printf("  -w, --timeout <value>     to define\n");
-    printf("  -t, --ttl <value>         to define\n");
-    printf("  -i, --interval <value>    to define\n");
+    printf("  -c, --count <value>       Number of packets to send\n");
+    printf("  -W, --linger <value>      Number of seconds to keep waiting for pending replies, once all packets have already been sent\n");
+    printf("  -w, --timeout <value>     Stop the whole program after N seconds have elapsed, regardless of how many packets were sent\n");
+    printf("  -t, --ttl <value>         Time to live for each packet\n");
+    printf("  -i, --interval <value>    Wait NUMBER seconds between sending each packet\n");
 }
 
 static bool is_between_int(char *arg, int min, int max)
@@ -118,7 +118,6 @@ void parse_opts(int argc, char *argv[], t_ping *ping)
             }
             ping->ttl = atoi(optarg);
             ping->mode |= OPT_TTL;
-            printf("Option --ttl with value: %s\n", optarg);
             break;
         }
         case 'W':
