@@ -12,6 +12,8 @@ This README is organized as follows:
   - [ICMP packet description](#icmp-packet-description)
     - [Packet send](#packet-send)
     - [Packet received](#packet-received)
+    - [Error messages (`-v`)](#error-messages--v)
+      - [ICMP header dump](#icmp-header-dump)
   - [TTL (Time To Live)](#ttl-time-to-live)
     - [Values](#values)
   - [RTT and statistics](#rtt-and-statistics)
@@ -22,6 +24,7 @@ This README is organized as follows:
     - [On `-w` vs `-W`](#on--w-vs--w)
     - [`Ctrl+C` handling](#ctrlc-handling)
 - [Simulating network conditions for testing](#simulating-network-conditions-for-testing)
+  - [Simulating `Destination Host Unreachable`](#simulating-destination-host-unreachable)
 - [How to Use `ft_ping`](#how-to-use-ft_ping)
 
 ---
@@ -110,7 +113,7 @@ payload) is the actual message being transported: type of message
 ARP is not implemented in this project, but it's worth
 understanding why `ft_ping`'s packets can leave the machine at all.
 
-**ARP (Address Resolution Protocol)** operates one layer below IP, at the
+**ARP** *(Address Resolution Protocol)* operates one layer below IP, at the
 Data Link layer. Before an IP packet can physically travel over a local
 network (Ethernet/WiFi), the sending machine needs to know the destination's
 **MAC address** (its physical network hardware address); IP addresses
@@ -159,6 +162,7 @@ requires the `CAP_NET_RAW` capability, reserved to root by default (see
 └── src
     ├── loop.c
     ├── parse_opts.c
+    ├── print_stats.c
     ├── receive.c
     ├── resolve_dest.c
     └── send.c
@@ -428,6 +432,83 @@ This is used to print the ping output:
 64 bytes from 142.251.39.110: icmp_seq=0 ttl=255 rtt=4.275 ms
 ```
 
+### Error messages (`-v`)
+
+Unlike an Echo Reply, ICMP error messages (`Time Exceeded`, `Destination Unreachable`, `Parameter Problem`) do **not** carry an `id`/`sequence`
+directly in their own ICMP header.  
+Instead, the ICMP error message contains the original IP packet that
+caused the error. For an `ft_ping` Echo Request, this embedded packet
+contains **the original IP header** followed by the **original ICMP Echo header**.
+
+```
+┌───────────────────────────┐
+│ Outer IP Header (20B)     │ source = router/host that raised the error
+├───────────────────────────┤
+│ ICMP Error Header (8B)    │ type (11/3/12), code, checksum, unused/pointer
+├───────────────────────────┤
+│ Original IP Header (20B)  │ copy of the packet that failed
+├───────────────────────────┤
+│ Original ICMP Header (8B) │ = our original ICMP Echo header
+├───────────────────────────┤ (this is where id/sequence are recovered)
+│ Original payload          │ 
+│ if included               │ 
+└───────────────────────────┘
+```
+
+To correctly identify which of our own requests triggered the error, we
+therefore need to skip **two IP headers and one ICMP header** before
+reaching the original `id`/`sequence`:
+
+```c
+    struct iphdr *ip_hdr = (struct iphdr *)buffer;
+    struct icmphdr *icmp = (struct icmphdr *)(buffer + ip_hdr->ihl * 4);
+    struct iphdr *orig_ip_hdr = (struct iphdr *)((unsigned char *)icmp + sizeof(struct icmphdr));
+    struct icmphdr *orig_icmp = (struct icmphdr *)((unsigned char *)orig_ip_hdr + sizeof(struct iphdr));
+
+```
+
+Error types handled:
+
+| Type | Value | Meaning |
+|------|-------|---------|
+| `ICMP_DEST_UNREACH`    | 3  | destination/network/port unreachable |
+| `ICMP_TIME_EXCEEDED`   | 11 | TTL reached 0 before arriving at destination |
+| `ICMP_PARAMETERPROB`   | 12 | malformed IP header/options in the original packet |
+
+None of these should crash the program — they must be reported (with
+`-v`) and the program must keep listening for further replies.
+
+#### ICMP header dump
+
+With `-v`, the reference `ping` prints a hex dump of this ICMP error
+packet, which is useful to visually confirm the structure above.
+
+Exemple output:
+```sh
+IP Hdr Dump:
+ 45c0 0070 efcd 0000 4001 71e2 0a00 020f 0a00 020f 
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst     Data
+ 4  5  00 0054 bba2   2 0000  40  01 36f7 10.0.2.15  203.0.113.0 
+ICMP: type: 8, code: 0, size: 64, id: 0x1772, seq: 0x0000
+```
+
+| Field           | Value         | Meaning                         |
+| --------------- | ------------- | ------------------------------- |
+| Version         | `4`           | IPv4                            |
+| Header Length   | `5`           | 5 × 4 = 20 bytes                |
+| TOS             | `0x00`        | Type of Service / DS field      |
+| Length          | `0x0054`      | 84 bytes total IP packet length |
+| ID              | `0xbba2`      | IPv4 identification field       |
+| Flags           | `2`           | Don't Fragment (`DF`)           |
+| Fragment offset | `0`           | Packet is not fragmented        |
+| TTL             | `40`          | Initial/default TTL (hex)       |
+| Protocol        | `1`           | ICMP                            |
+| Checksum        | `0x36f7`      | IPv4 header checksum            |
+| Source          | `10.0.2.15`   | Source IP                       |
+| Destination     | `203.0.113.0` | Destination IP                  |
+
+
+
 ## TTL (Time To Live)
 
 The TTL is a field of the IPv4 header (8 bits, values from 0 to 255). It
@@ -665,6 +746,44 @@ packet's checksum doesn't match its content, which tells you immediately
 whether an "invalid checksum" bug is on the sending side (bad packet on
 the wire) or on `ft_ping`'s own verification logic (packet is actually
 fine).
+
+## Simulating `Destination Host Unreachable`
+
+A `Destination Host Unreachable` error can also be triggered by adding
+an unreachable route inside the VM.
+
+For example:
+
+```sh
+sudo ip route add 203.0.113.0/24 via 10.0.2.254
+```
+
+- `203.0.113.0/24` is the destination network we want to reach.
+via `10.0.2.254` tells Linux to forward packets for this network
+through `10.0.2.254`.  
+- `10.0.2.254` must be an appropriate next-hop address for the VM's
+network. Check the VM's routing table with:  
+  ``` sh
+  ip route
+  ```
+
+Once the route has been added, try to reach an address in that network:
+
+``` sh
+sudo ./ft_ping -c 1 203.0.113.1
+```
+
+If the configured next-hop cannot reach the destination, the network
+stack can generate an ICMP Destination Unreachable error.
+
+For example:
+```sh
+92 bytes from 10.0.2.15: Destination Unreachable
+```
+
+This is useful for testing how `ft_ping` handles ICMP error messages
+(type 3) and verifies that the program does not terminate when an
+unreachable destination is reported.
 
 ---
 

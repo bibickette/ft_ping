@@ -162,11 +162,11 @@ static void handle_wrong_type(t_ping *ping, int result, char *buffer)
     if (icmp->type == ICMP_DEST_UNREACH || icmp->type == ICMP_TIME_EXCEEDED || icmp->type == ICMP_PARAMETERPROB)
     {
         ping->packets_error++; // increment lost packets count since we received a non-echo reply packet
+        printf("%d bytes from %s: %s\n", result - ip_hdr->ihl * 4, inet_ntoa(*(struct in_addr *)&ip_hdr->saddr), icmp_type_to_string(icmp->type));
         if(!(ping->mode & OPT_VERBOSE))
         {
             return;
         }        
-        printf("%d bytes from %s: %s\n", result - ip_hdr->ihl * 4, inet_ntoa(*(struct in_addr *)&ip_hdr->saddr), icmp_type_to_string(icmp->type));
         printf("IP Hdr Dump:\n ");
         for (int i = 0; i < 20 && i < result; i++)
         {

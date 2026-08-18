@@ -30,11 +30,14 @@ void print_stats(t_ping *ping)
     {
         avg_time = ping->rtt.total / (ping->packets_received + ping->duplicates);
     }
-
+    
     double stddev = calculate_stddev(&ping->rtt, ping->packets_received + ping->duplicates, avg_time);
-    printf("round-trip min/avg/max/stddev = ");
-    printf("%.3f/", ping->rtt.min);
-    printf("%.3f/", avg_time);
-    printf("%.3f/", ping->rtt.max);
-    printf("%.3f ms\n", stddev);
+    if ((ping->packets_received + ping->duplicates) != 0)
+    {
+        printf("round-trip min/avg/max/stddev = ");
+        printf("%.3f/", ping->rtt.min);
+        printf("%.3f/", avg_time);
+        printf("%.3f/", ping->rtt.max);
+        printf("%.3f ms\n", stddev);
+    }
 }
