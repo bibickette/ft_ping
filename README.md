@@ -1,5 +1,4 @@
 # Project presentation - `ft_ping`
-**Introduction**
 
 This README is organized as follows:
 - [Description](#description)
